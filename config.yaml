@@ -1,0 +1,26 @@
+server:
+  tcp_port: 13400
+  udp_port: 13400
+  client_logical_address_min: 0x7E0
+  client_logical_address_max: 0x7EF
+
+ecus:
+  - logical_address: 0x0E80
+    name: "Engine ECU"
+    services:
+      - sid: 0x22          # ReadDataByIdentifier
+        dids:
+          - id: 0xF190
+            value: "WBA12345678901234"
+          - id: 0xF18C
+            value: "ECU001"
+      - sid: 0x10          # DiagnosticSessionControl
+        sessions: [0x01, 0x02, 0x03]
+
+  - logical_address: 0x0E81
+    name: "Transmission ECU"
+    services:
+      - sid: 0x22
+        dids:
+          - id: 0xF190
+            value: "WBA12345678901234"
