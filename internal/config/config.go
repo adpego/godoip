@@ -7,10 +7,13 @@ import (
 )
 
 type ServerConfig struct {
-	TCPPort                 int `yaml:"tcp_port"`
-	UDPPort                 int `yaml:"udp_port"`
-	ClientLogicalAddressMin int `yaml:"client_logical_address_min"`
-	ClientLogicalAddressMax int `yaml:"client_logical_address_max"`
+	TCPPort                 int    `yaml:"tcp_port"`
+	UDPPort                 int    `yaml:"udp_port"`
+	DoIPVersion             uint8  `yaml:"doip_version"`
+	EID                     string `yaml:"eid"` // hex MAC, e.g. "00:1A:2B:3C:4D:5E"
+	GID                     string `yaml:"gid"` // hex MAC-like group ID
+	ClientLogicalAddressMin int    `yaml:"client_logical_address_min"`
+	ClientLogicalAddressMax int    `yaml:"client_logical_address_max"`
 }
 
 type DID struct {
