@@ -27,7 +27,12 @@ func main() {
 	}()
 
 	go func() {
-		errCh <- transport.NewTCPServer(cfg.Server.TCPPort).Listen()
+		tcpServer := transport.NewTCPServer(
+			cfg.Server.TCPPort,
+			cfg.Server.DoIPVersion,
+			uint16(cfg.Server.LogicalAddress),
+		)
+		errCh <- tcpServer.Listen()
 	}()
 
 	if err := <-errCh; err != nil {

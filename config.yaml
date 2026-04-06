@@ -1,7 +1,8 @@
 server:
   tcp_port: 13400
   udp_port: 13400
-  doip_version: 0x02
+  doip_version: 0x03
+  logical_address: 0x0E00
   eid: "00:1A:2B:3C:4D:5E"
   gid: "00:1A:2B:3C:4D:5F"
   client_logical_address_min: 0x7E0

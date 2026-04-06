@@ -10,6 +10,7 @@ type ServerConfig struct {
 	TCPPort                 int    `yaml:"tcp_port"`
 	UDPPort                 int    `yaml:"udp_port"`
 	DoIPVersion             uint8  `yaml:"doip_version"`
+	LogicalAddress          int    `yaml:"logical_address"`
 	EID                     string `yaml:"eid"` // hex MAC, e.g. "00:1A:2B:3C:4D:5E"
 	GID                     string `yaml:"gid"` // hex MAC-like group ID
 	ClientLogicalAddressMin int    `yaml:"client_logical_address_min"`
