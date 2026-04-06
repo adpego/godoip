@@ -31,6 +31,8 @@ func main() {
 			cfg.Server.TCPPort,
 			cfg.Server.DoIPVersion,
 			uint16(cfg.Server.LogicalAddress),
+			uint16(cfg.Server.ClientLogicalAddressMin),
+			uint16(cfg.Server.ClientLogicalAddressMax),
 		)
 		errCh <- tcpServer.Listen()
 	}()

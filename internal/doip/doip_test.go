@@ -1,0 +1,155 @@
+package doip
+
+import (
+	"bytes"
+	"testing"
+)
+
+// --- BuildHeader ---
+
+func TestBuildHeader(t *testing.T) {
+	h := BuildHeader(0x02, VehicleIdentResponse, 33)
+
+	if h[0] != 0x02 {
+		t.Errorf("version: got 0x%02X, want 0x02", h[0])
+	}
+	if h[1] != ^uint8(0x02) {
+		t.Errorf("inverse version: got 0x%02X, want 0x%02X", h[1], ^uint8(0x02))
+	}
+	if h[2] != 0x00 || h[3] != 0x04 {
+		t.Errorf("payload type: got 0x%02X%02X, want 0x0004", h[2], h[3])
+	}
+	if h[4] != 0x00 || h[5] != 0x00 || h[6] != 0x00 || h[7] != 0x21 {
+		t.Errorf("payload length: got %d, want 33", uint32(h[4])<<24|uint32(h[5])<<16|uint32(h[6])<<8|uint32(h[7]))
+	}
+}
+
+func TestBuildHeaderLength(t *testing.T) {
+	h := BuildHeader(0x02, GenericNack, 0)
+	if len(h) != HeaderLength {
+		t.Errorf("header length: got %d, want %d", len(h), HeaderLength)
+	}
+}
+
+// --- ReadHeader ---
+
+func TestReadHeader(t *testing.T) {
+	original := BuildHeader(0x03, RoutingActivationReq, 7)
+	hdr, err := ReadHeader(bytes.NewReader(original))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hdr.Version != 0x03 {
+		t.Errorf("version: got 0x%02X, want 0x03", hdr.Version)
+	}
+	if hdr.PayloadType != RoutingActivationReq {
+		t.Errorf("payload type: got 0x%04X, want 0x%04X", hdr.PayloadType, RoutingActivationReq)
+	}
+	if hdr.PayloadLen != 7 {
+		t.Errorf("payload length: got %d, want 7", hdr.PayloadLen)
+	}
+}
+
+func TestReadHeaderTooShort(t *testing.T) {
+	_, err := ReadHeader(bytes.NewReader([]byte{0x02, 0xFD}))
+	if err == nil {
+		t.Error("expected error for short input, got nil")
+	}
+}
+
+// --- ParseRoutingActivationRequest ---
+
+func TestParseRoutingActivationRequest(t *testing.T) {
+	payload := []byte{0x0E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} // addr=0x0E00, type=0x00
+	req, err := ParseRoutingActivationRequest(payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if req.SourceAddress != 0x0E00 {
+		t.Errorf("source address: got 0x%04X, want 0x0E00", req.SourceAddress)
+	}
+	if req.ActivationType != 0x00 {
+		t.Errorf("activation type: got 0x%02X, want 0x00", req.ActivationType)
+	}
+}
+
+func TestParseRoutingActivationRequestTooShort(t *testing.T) {
+	_, err := ParseRoutingActivationRequest([]byte{0x0E, 0x00})
+	if err == nil {
+		t.Error("expected error for short payload, got nil")
+	}
+}
+
+// --- BuildRoutingActivationResponse ---
+
+func TestBuildRoutingActivationResponse(t *testing.T) {
+	msg := BuildRoutingActivationResponse(0x02, 0x0E00, 0x0E80, ActivationSuccess)
+
+	if len(msg) != HeaderLength+9 {
+		t.Fatalf("message length: got %d, want %d", len(msg), HeaderLength+9)
+	}
+
+	// Check header payload type
+	hdr, _ := ReadHeader(bytes.NewReader(msg[:HeaderLength]))
+	if hdr.PayloadType != RoutingActivationResp {
+		t.Errorf("payload type: got 0x%04X, want 0x%04X", hdr.PayloadType, RoutingActivationResp)
+	}
+
+	payload := msg[HeaderLength:]
+	clientAddr := uint16(payload[0])<<8 | uint16(payload[1])
+	gatewayAddr := uint16(payload[2])<<8 | uint16(payload[3])
+	code := payload[4]
+
+	if clientAddr != 0x0E00 {
+		t.Errorf("client addr: got 0x%04X, want 0x0E00", clientAddr)
+	}
+	if gatewayAddr != 0x0E80 {
+		t.Errorf("gateway addr: got 0x%04X, want 0x0E80", gatewayAddr)
+	}
+	if code != ActivationSuccess {
+		t.Errorf("response code: got 0x%02X, want 0x%02X", code, ActivationSuccess)
+	}
+}
+
+// --- BuildAnnouncement ---
+
+func TestBuildAnnouncement(t *testing.T) {
+	p := AnnouncePayload{
+		Version:        0x02,
+		VIN:            "WBA12345678901234",
+		LogicalAddress: 0x0E00,
+		EID:            [6]byte{0x00, 0x1A, 0x2B, 0x3C, 0x4D, 0x5E},
+		GID:            [6]byte{0x00, 0x1A, 0x2B, 0x3C, 0x4D, 0x5F},
+	}
+	msg := BuildAnnouncement(p)
+
+	if len(msg) != HeaderLength+33 {
+		t.Fatalf("message length: got %d, want %d", len(msg), HeaderLength+33)
+	}
+
+	hdr, _ := ReadHeader(bytes.NewReader(msg[:HeaderLength]))
+	if hdr.PayloadType != VehicleIdentResponse {
+		t.Errorf("payload type: got 0x%04X, want 0x%04X", hdr.PayloadType, VehicleIdentResponse)
+	}
+
+	payload := msg[HeaderLength:]
+	if string(payload[0:17]) != "WBA12345678901234" {
+		t.Errorf("VIN: got %q, want %q", string(payload[0:17]), "WBA12345678901234")
+	}
+	logAddr := uint16(payload[17])<<8 | uint16(payload[18])
+	if logAddr != 0x0E00 {
+		t.Errorf("logical address: got 0x%04X, want 0x0E00", logAddr)
+	}
+}
+
+func TestBuildAnnouncementVINTooLong(t *testing.T) {
+	p := AnnouncePayload{
+		Version: 0x02,
+		VIN:     "ABCDEFGHIJKLMNOPQRSTUVWXYZ", // 26 chars, must be truncated to 17
+	}
+	msg := BuildAnnouncement(p)
+	payload := msg[HeaderLength:]
+	if len(payload[0:17]) != 17 {
+		t.Errorf("VIN field should always be 17 bytes")
+	}
+}
