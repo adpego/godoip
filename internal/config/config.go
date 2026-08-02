@@ -10,35 +10,18 @@ type ServerConfig struct {
 	TCPPort                 int    `yaml:"tcp_port"`
 	UDPPort                 int    `yaml:"udp_port"`
 	DoIPVersion             uint8  `yaml:"doip_version"`
-	LogicalAddress          int    `yaml:"logical_address"`
-	EID                     string `yaml:"eid"` // hex MAC, e.g. "00:1A:2B:3C:4D:5E"
-	GID                     string `yaml:"gid"` // hex MAC-like group ID
+	LogicalAddress          int    `yaml:"logical_address"`    // DoIP entity address, also the ECU physical address
+	FunctionalAddress       int    `yaml:"functional_address"` // UDS functional address; defaults to 0xE400
+	VIN                     string `yaml:"vin"`                // announced VIN; defaults to DID 0xF190 if present
+	EID                     string `yaml:"eid"`                // hex MAC, e.g. "00:1A:2B:3C:4D:5E"
+	GID                     string `yaml:"gid"`                // hex MAC-like group ID
 	ClientLogicalAddressMin int    `yaml:"client_logical_address_min"`
 	ClientLogicalAddressMax int    `yaml:"client_logical_address_max"`
 }
 
-type DID struct {
-	ID    int    `yaml:"id"`
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
-	NRC   byte   `yaml:"nrc"` // if non-zero, respond with this NRC instead of value
-}
-
-type Service struct {
-	SID      int   `yaml:"sid"`
-	NRC      byte  `yaml:"nrc"` // if non-zero, deny the entire service with this NRC
-	DIDs     []DID `yaml:"dids"`
-	Sessions []int `yaml:"sessions"`
-}
-
-type ECU struct {
-	LogicalAddress int       `yaml:"logical_address"`
-	Services       []Service `yaml:"services"`
-}
-
 type Config struct {
 	Server ServerConfig `yaml:"server"`
-	ECUs   []ECU        `yaml:"ecus"`
+	ECU    ECU          `yaml:"ecu"`
 }
 
 func Load(path string) (*Config, error) {
@@ -46,11 +29,14 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	return Parse(data)
+}
 
+// Parse decodes a YAML configuration document.
+func Parse(data []byte) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
-
 	return &cfg, nil
 }

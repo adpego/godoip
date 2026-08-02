@@ -7,12 +7,20 @@ import (
 	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/doip"
 	"github.com/adpego/godoip/internal/transport"
+	"github.com/adpego/godoip/internal/uds"
 )
+
+const defaultFunctionalAddress = 0xE400
 
 func main() {
 	cfg, err := config.Load("config.yaml")
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
+	}
+
+	ecu, err := uds.NewECU(cfg.ECU)
+	if err != nil {
+		log.Fatalf("invalid ECU config: %v", err)
 	}
 
 	announce, err := buildAnnouncement(cfg)
@@ -27,15 +35,7 @@ func main() {
 	}()
 
 	go func() {
-		tcpServer := transport.NewTCPServer(
-			cfg.Server.TCPPort,
-			cfg.Server.DoIPVersion,
-			uint16(cfg.Server.LogicalAddress),
-			uint16(cfg.Server.ClientLogicalAddressMin),
-			uint16(cfg.Server.ClientLogicalAddressMax),
-			cfg.ECUs,
-		)
-		errCh <- tcpServer.Listen()
+		errCh <- transport.NewTCPServer(buildTCPConfig(cfg), ecu).Listen()
 	}()
 
 	if err := <-errCh; err != nil {
@@ -53,22 +53,22 @@ func parseHWAddr(s string) ([6]byte, error) {
 	return out, nil
 }
 
-func buildAnnouncement(cfg *config.Config) (doip.AnnouncePayload, error) {
-	var vin string
-	var logicalAddr uint16
-
-	if len(cfg.ECUs) > 0 {
-		ecu := cfg.ECUs[0]
-		logicalAddr = uint16(ecu.LogicalAddress)
-		for _, svc := range ecu.Services {
-			for _, did := range svc.DIDs {
-				if did.ID == 0xF190 {
-					vin = did.Value
-				}
-			}
-		}
+func buildTCPConfig(cfg *config.Config) transport.TCPConfig {
+	functional := cfg.Server.FunctionalAddress
+	if functional == 0 {
+		functional = defaultFunctionalAddress
 	}
+	return transport.TCPConfig{
+		Port:              cfg.Server.TCPPort,
+		DoIPVersion:       cfg.Server.DoIPVersion,
+		LogicalAddress:    uint16(cfg.Server.LogicalAddress),
+		FunctionalAddress: uint16(functional),
+		ClientAddrMin:     uint16(cfg.Server.ClientLogicalAddressMin),
+		ClientAddrMax:     uint16(cfg.Server.ClientLogicalAddressMax),
+	}
+}
 
+func buildAnnouncement(cfg *config.Config) (doip.AnnouncePayload, error) {
 	eid, err := parseHWAddr(cfg.Server.EID)
 	if err != nil {
 		return doip.AnnouncePayload{}, err
@@ -81,8 +81,8 @@ func buildAnnouncement(cfg *config.Config) (doip.AnnouncePayload, error) {
 
 	return doip.AnnouncePayload{
 		Version:        cfg.Server.DoIPVersion,
-		VIN:            vin,
-		LogicalAddress: logicalAddr,
+		VIN:            cfg.Server.VIN,
+		LogicalAddress: uint16(cfg.Server.LogicalAddress),
 		EID:            eid,
 		GID:            gid,
 	}, nil

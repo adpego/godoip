@@ -2,29 +2,37 @@ server:
   tcp_port: 13400
   udp_port: 13400
   doip_version: 0x03
-  logical_address: 0x0E00
+  logical_address: 0x0E80       # DoIP entity address = ECU physical address
+  functional_address: 0xE400    # UDS functional address
+  vin: "WBA12345678901234"
   eid: "00:1A:2B:3C:4D:5E"
   gid: "00:1A:2B:3C:4D:5F"
-  client_logical_address_min: 0x7E0
-  client_logical_address_max: 0x7EF
+  client_logical_address_min: 0x07E0
+  client_logical_address_max: 0x07EF
 
-ecus:
-  - logical_address: 0x0E80
-    name: "Engine ECU"
-    services:
-      - sid: 0x22          # ReadDataByIdentifier
-        dids:
-          - id: 0xF190
-            value: "WBA12345678901234"
-          - id: 0xF18C
-            value: "ECU001"
-      - sid: 0x10          # DiagnosticSessionControl
-        sessions: [0x01, 0x02, 0x03]
+# Every element (service, session, DID...) can have an `access` block:
+#   access:
+#     sessions: [0x03]          # allowed active sessions (empty = any)
+#     security_levels: [0x01]   # one of these levels must be unlocked (empty = none)
+#     nrc: 0x22                 # always answer with this NRC
+ecu:
+  name: "Engine ECU"
+  s3_timeout_ms: 5000
 
-  - logical_address: 0x0E81
-    name: "Transmission ECU"
-    services:
-      - sid: 0x22
-        dids:
-          - id: 0xF190
-            value: "WBA12345678901234"
+  # A service missing from this list is not supported (NRC 0x11).
+  # Use `{}` to enable a service with its default settings.
+  services:
+    diagnostic_session_control:
+      sessions:
+        - id: 0x01
+          name: default
+        - id: 0x02
+          name: programming
+          p2_ms: 25
+          p2_star_ms: 5000
+          access:
+            sessions: [0x03]    # programming can only be entered from extended
+        - id: 0x03
+          name: extended
+
+    tester_present: {}

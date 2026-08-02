@@ -7,39 +7,40 @@ import (
 	"net"
 	"sync"
 
-	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/doip"
 	"github.com/adpego/godoip/internal/uds"
 )
 
 const maxSessions = 15 // ISO 13400 allows up to 15 concurrent TCP connections
 
+// TCPConfig holds the DoIP settings of the TCP server.
+type TCPConfig struct {
+	Port              int
+	DoIPVersion       uint8
+	LogicalAddress    uint16 // DoIP entity and ECU physical address
+	FunctionalAddress uint16 // UDS functional address
+	ClientAddrMin     uint16
+	ClientAddrMax     uint16
+}
+
 type TCPServer struct {
-	port          int
-	doipVersion   uint8
-	gatewayAddr   uint16
-	clientAddrMin uint16
-	clientAddrMax uint16
-	ecus          []config.ECU
+	cfg TCPConfig
+	ecu *uds.ECU
 
 	mu             sync.Mutex
 	activeSessions map[uint16]net.Conn // sourceAddr -> conn
 }
 
-func NewTCPServer(port int, doipVersion uint8, gatewayAddr, clientAddrMin, clientAddrMax uint16, ecus []config.ECU) *TCPServer {
+func NewTCPServer(cfg TCPConfig, ecu *uds.ECU) *TCPServer {
 	return &TCPServer{
-		port:           port,
-		doipVersion:    doipVersion,
-		gatewayAddr:    gatewayAddr,
-		clientAddrMin:  clientAddrMin,
-		clientAddrMax:  clientAddrMax,
-		ecus:           ecus,
+		cfg:            cfg,
+		ecu:            ecu,
 		activeSessions: make(map[uint16]net.Conn),
 	}
 }
 
 func (s *TCPServer) Listen() error {
-	addr := fmt.Sprintf(":%d", s.port)
+	addr := fmt.Sprintf(":%d", s.cfg.Port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("tcp listen on %s: %w", addr, err)
@@ -122,40 +123,36 @@ func (s *TCPServer) handleDiagnosticMessage(conn net.Conn, payload []byte, regis
 
 	// Source address must match the registered address for this session
 	if msg.SourceAddress != registeredAddr {
-		nack := doip.BuildDiagnosticNack(s.doipVersion, msg.TargetAddress, msg.SourceAddress, doip.DiagNackInvalidSourceAddress)
+		nack := doip.BuildDiagnosticNack(s.cfg.DoIPVersion, msg.TargetAddress, msg.SourceAddress, doip.DiagNackInvalidSourceAddress)
 		conn.Write(nack)
 		return
 	}
 
-	// Target ECU must exist
-	if !s.ecuExists(msg.TargetAddress) {
-		nack := doip.BuildDiagnosticNack(s.doipVersion, msg.TargetAddress, msg.SourceAddress, doip.DiagNackUnknownTargetAddress)
+	// Target must be the ECU itself or the functional address
+	functional := msg.TargetAddress == s.cfg.FunctionalAddress
+	if msg.TargetAddress != s.cfg.LogicalAddress && !functional {
+		nack := doip.BuildDiagnosticNack(s.cfg.DoIPVersion, msg.TargetAddress, msg.SourceAddress, doip.DiagNackUnknownTargetAddress)
 		conn.Write(nack)
 		return
 	}
 
 	// Acknowledge receipt
-	ack := doip.BuildDiagnosticAck(s.doipVersion, msg.TargetAddress, msg.SourceAddress)
+	ack := doip.BuildDiagnosticAck(s.cfg.DoIPVersion, msg.TargetAddress, msg.SourceAddress)
 	if _, err := conn.Write(ack); err != nil {
 		log.Printf("diagnostic ack write error: %v", err)
 		return
 	}
 
-	// Process UDS and send response
-	udsResp := uds.HandleRequest(s.ecus, msg.TargetAddress, msg.UserData)
-	resp := doip.BuildDiagnosticMsg(s.doipVersion, msg.TargetAddress, msg.SourceAddress, udsResp)
+	// Process UDS and send response (if any). Responses always come from the
+	// ECU physical address, even for functional requests.
+	udsResp := s.ecu.Handle(msg.UserData, functional)
+	if udsResp == nil {
+		return
+	}
+	resp := doip.BuildDiagnosticMsg(s.cfg.DoIPVersion, s.cfg.LogicalAddress, msg.SourceAddress, udsResp)
 	if _, err := conn.Write(resp); err != nil {
 		log.Printf("diagnostic response write error: %v", err)
 	}
-}
-
-func (s *TCPServer) ecuExists(addr uint16) bool {
-	for _, ecu := range s.ecus {
-		if uint16(ecu.LogicalAddress) == addr {
-			return true
-		}
-	}
-	return false
 }
 
 // handleRoutingActivation processes the request and returns (sourceAddr, keep connection).
@@ -169,7 +166,7 @@ func (s *TCPServer) handleRoutingActivation(conn net.Conn, payload []byte, curre
 	log.Printf("Routing activation request from 0x%04X, type 0x%02X", req.SourceAddress, req.ActivationType)
 
 	code := s.validateActivation(conn, req, currentAddr, alreadyActivated)
-	resp := doip.BuildRoutingActivationResponse(s.doipVersion, req.SourceAddress, s.gatewayAddr, code)
+	resp := doip.BuildRoutingActivationResponse(s.cfg.DoIPVersion, req.SourceAddress, s.cfg.LogicalAddress, code)
 
 	if _, err := conn.Write(resp); err != nil {
 		log.Printf("routing activation response write error: %v", err)
@@ -193,7 +190,7 @@ func (s *TCPServer) validateActivation(conn net.Conn, req doip.RoutingActivation
 	if req.ActivationType > 0x01 {
 		return doip.ActivationDeniedUnsupportedType
 	}
-	if req.SourceAddress < s.clientAddrMin || req.SourceAddress > s.clientAddrMax {
+	if req.SourceAddress < s.cfg.ClientAddrMin || req.SourceAddress > s.cfg.ClientAddrMax {
 		return doip.ActivationDeniedUnknownSrc
 	}
 	if alreadyActivated && currentAddr != req.SourceAddress {
