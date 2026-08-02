@@ -7,29 +7,33 @@ import (
 	"net"
 	"sync"
 
+	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/doip"
+	"github.com/adpego/godoip/internal/uds"
 )
 
 const maxSessions = 15 // ISO 13400 allows up to 15 concurrent TCP connections
 
 type TCPServer struct {
-	port           int
-	doipVersion    uint8
-	gatewayAddr    uint16
-	clientAddrMin  uint16
-	clientAddrMax  uint16
+	port          int
+	doipVersion   uint8
+	gatewayAddr   uint16
+	clientAddrMin uint16
+	clientAddrMax uint16
+	ecus          []config.ECU
 
 	mu             sync.Mutex
 	activeSessions map[uint16]net.Conn // sourceAddr -> conn
 }
 
-func NewTCPServer(port int, doipVersion uint8, gatewayAddr, clientAddrMin, clientAddrMax uint16) *TCPServer {
+func NewTCPServer(port int, doipVersion uint8, gatewayAddr, clientAddrMin, clientAddrMax uint16, ecus []config.ECU) *TCPServer {
 	return &TCPServer{
 		port:           port,
 		doipVersion:    doipVersion,
 		gatewayAddr:    gatewayAddr,
 		clientAddrMin:  clientAddrMin,
 		clientAddrMax:  clientAddrMax,
+		ecus:           ecus,
 		activeSessions: make(map[uint16]net.Conn),
 	}
 }
@@ -89,14 +93,69 @@ func (s *TCPServer) handleConn(conn net.Conn) {
 		case doip.RoutingActivationReq:
 			addr, ok := s.handleRoutingActivation(conn, payload, registeredAddr, activated)
 			if !ok {
-				return // connection must be closed after denial
+				return
 			}
 			registeredAddr = addr
 			activated = true
+
+		case doip.DiagnosticMessage:
+			if !activated {
+				log.Printf("Diagnostic message received before routing activation from %s", conn.RemoteAddr())
+				return
+			}
+			s.handleDiagnosticMessage(conn, payload, registeredAddr)
+
 		default:
 			log.Printf("TCP unhandled payload type: 0x%04X", hdr.PayloadType)
 		}
 	}
+}
+
+func (s *TCPServer) handleDiagnosticMessage(conn net.Conn, payload []byte, registeredAddr uint16) {
+	msg, err := doip.ParseDiagnosticMessage(payload)
+	if err != nil {
+		log.Printf("diagnostic message parse error: %v", err)
+		return
+	}
+
+	log.Printf("Diagnostic message: src=0x%04X target=0x%04X uds=% X", msg.SourceAddress, msg.TargetAddress, msg.UserData)
+
+	// Source address must match the registered address for this session
+	if msg.SourceAddress != registeredAddr {
+		nack := doip.BuildDiagnosticNack(s.doipVersion, msg.TargetAddress, msg.SourceAddress, doip.DiagNackInvalidSourceAddress)
+		conn.Write(nack)
+		return
+	}
+
+	// Target ECU must exist
+	if !s.ecuExists(msg.TargetAddress) {
+		nack := doip.BuildDiagnosticNack(s.doipVersion, msg.TargetAddress, msg.SourceAddress, doip.DiagNackUnknownTargetAddress)
+		conn.Write(nack)
+		return
+	}
+
+	// Acknowledge receipt
+	ack := doip.BuildDiagnosticAck(s.doipVersion, msg.TargetAddress, msg.SourceAddress)
+	if _, err := conn.Write(ack); err != nil {
+		log.Printf("diagnostic ack write error: %v", err)
+		return
+	}
+
+	// Process UDS and send response
+	udsResp := uds.HandleRequest(s.ecus, msg.TargetAddress, msg.UserData)
+	resp := doip.BuildDiagnosticMsg(s.doipVersion, msg.TargetAddress, msg.SourceAddress, udsResp)
+	if _, err := conn.Write(resp); err != nil {
+		log.Printf("diagnostic response write error: %v", err)
+	}
+}
+
+func (s *TCPServer) ecuExists(addr uint16) bool {
+	for _, ecu := range s.ecus {
+		if uint16(ecu.LogicalAddress) == addr {
+			return true
+		}
+	}
+	return false
 }
 
 // handleRoutingActivation processes the request and returns (sourceAddr, keep connection).
@@ -131,17 +190,12 @@ func (s *TCPServer) handleRoutingActivation(conn net.Conn, payload []byte, curre
 }
 
 func (s *TCPServer) validateActivation(conn net.Conn, req doip.RoutingActivationRequest, currentAddr uint16, alreadyActivated bool) uint8 {
-	// Unsupported activation type (only 0x00 Default and 0x01 WWH-OBD are defined)
 	if req.ActivationType > 0x01 {
 		return doip.ActivationDeniedUnsupportedType
 	}
-
-	// Source address out of allowed range
 	if req.SourceAddress < s.clientAddrMin || req.SourceAddress > s.clientAddrMax {
 		return doip.ActivationDeniedUnknownSrc
 	}
-
-	// This socket is already activated with a different source address
 	if alreadyActivated && currentAddr != req.SourceAddress {
 		return doip.ActivationDeniedSAMismatch
 	}
@@ -149,12 +203,9 @@ func (s *TCPServer) validateActivation(conn net.Conn, req doip.RoutingActivation
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Source address already active on a different socket
 	if existing, ok := s.activeSessions[req.SourceAddress]; ok && existing != conn {
 		return doip.ActivationDeniedSAAlreadyActive
 	}
-
-	// No free sockets
 	if len(s.activeSessions) >= maxSessions {
 		return doip.ActivationDeniedNoFreeSockets
 	}

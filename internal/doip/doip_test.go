@@ -153,3 +153,84 @@ func TestBuildAnnouncementVINTooLong(t *testing.T) {
 		t.Errorf("VIN field should always be 17 bytes")
 	}
 }
+
+// --- ParseDiagnosticMessage ---
+
+func TestParseDiagnosticMessage(t *testing.T) {
+	payload := []byte{0x0E, 0x00, 0x0E, 0x80, 0x22, 0xF1, 0x90}
+	msg, err := ParseDiagnosticMessage(payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if msg.SourceAddress != 0x0E00 {
+		t.Errorf("source address: got 0x%04X, want 0x0E00", msg.SourceAddress)
+	}
+	if msg.TargetAddress != 0x0E80 {
+		t.Errorf("target address: got 0x%04X, want 0x0E80", msg.TargetAddress)
+	}
+	if !bytes.Equal(msg.UserData, []byte{0x22, 0xF1, 0x90}) {
+		t.Errorf("user data: got % X, want 22 F1 90", msg.UserData)
+	}
+}
+
+func TestParseDiagnosticMessageTooShort(t *testing.T) {
+	_, err := ParseDiagnosticMessage([]byte{0x0E, 0x00, 0x0E})
+	if err == nil {
+		t.Error("expected error for short payload, got nil")
+	}
+}
+
+// --- BuildDiagnosticAck ---
+
+func TestBuildDiagnosticAck(t *testing.T) {
+	msg := BuildDiagnosticAck(0x02, 0x0E80, 0x0E00)
+
+	if len(msg) != HeaderLength+5 {
+		t.Fatalf("length: got %d, want %d", len(msg), HeaderLength+5)
+	}
+	hdr, _ := ReadHeader(bytes.NewReader(msg[:HeaderLength]))
+	if hdr.PayloadType != DiagnosticPositiveAck {
+		t.Errorf("payload type: got 0x%04X, want 0x%04X", hdr.PayloadType, DiagnosticPositiveAck)
+	}
+	payload := msg[HeaderLength:]
+	if payload[4] != 0x00 {
+		t.Errorf("ack code: got 0x%02X, want 0x00", payload[4])
+	}
+}
+
+// --- BuildDiagnosticNack ---
+
+func TestBuildDiagnosticNack(t *testing.T) {
+	msg := BuildDiagnosticNack(0x02, 0x0E80, 0x0E00, DiagNackUnknownTargetAddress)
+
+	if len(msg) != HeaderLength+5 {
+		t.Fatalf("length: got %d, want %d", len(msg), HeaderLength+5)
+	}
+	hdr, _ := ReadHeader(bytes.NewReader(msg[:HeaderLength]))
+	if hdr.PayloadType != DiagnosticNegativeAck {
+		t.Errorf("payload type: got 0x%04X, want 0x%04X", hdr.PayloadType, DiagnosticNegativeAck)
+	}
+	payload := msg[HeaderLength:]
+	if payload[4] != DiagNackUnknownTargetAddress {
+		t.Errorf("nack code: got 0x%02X, want 0x%02X", payload[4], DiagNackUnknownTargetAddress)
+	}
+}
+
+// --- BuildDiagnosticMsg ---
+
+func TestBuildDiagnosticMsg(t *testing.T) {
+	udsData := []byte{0x62, 0xF1, 0x90, 0x57, 0x42, 0x41}
+	msg := BuildDiagnosticMsg(0x02, 0x0E80, 0x0E00, udsData)
+
+	if len(msg) != HeaderLength+4+len(udsData) {
+		t.Fatalf("length: got %d, want %d", len(msg), HeaderLength+4+len(udsData))
+	}
+	hdr, _ := ReadHeader(bytes.NewReader(msg[:HeaderLength]))
+	if hdr.PayloadType != DiagnosticMessage {
+		t.Errorf("payload type: got 0x%04X, want 0x%04X", hdr.PayloadType, DiagnosticMessage)
+	}
+	payload := msg[HeaderLength:]
+	if !bytes.Equal(payload[4:], udsData) {
+		t.Errorf("uds data: got % X, want % X", payload[4:], udsData)
+	}
+}

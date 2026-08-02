@@ -39,3 +39,21 @@ func ParseRoutingActivationRequest(payload []byte) (RoutingActivationRequest, er
 		ActivationType: payload[2],
 	}, nil
 }
+
+// DiagnosticMsg represents payload type 0x8001.
+type DiagnosticMsg struct {
+	SourceAddress uint16
+	TargetAddress uint16
+	UserData      []byte
+}
+
+func ParseDiagnosticMessage(payload []byte) (DiagnosticMsg, error) {
+	if len(payload) < 5 {
+		return DiagnosticMsg{}, fmt.Errorf("diagnostic message too short: %d bytes", len(payload))
+	}
+	return DiagnosticMsg{
+		SourceAddress: binary.BigEndian.Uint16(payload[0:2]),
+		TargetAddress: binary.BigEndian.Uint16(payload[2:4]),
+		UserData:      payload[4:],
+	}, nil
+}

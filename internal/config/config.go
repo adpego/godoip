@@ -21,10 +21,12 @@ type DID struct {
 	ID    int    `yaml:"id"`
 	Name  string `yaml:"name"`
 	Value string `yaml:"value"`
+	NRC   byte   `yaml:"nrc"` // if non-zero, respond with this NRC instead of value
 }
 
 type Service struct {
 	SID      int   `yaml:"sid"`
+	NRC      byte  `yaml:"nrc"` // if non-zero, deny the entire service with this NRC
 	DIDs     []DID `yaml:"dids"`
 	Sessions []int `yaml:"sessions"`
 }

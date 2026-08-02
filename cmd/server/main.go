@@ -33,6 +33,7 @@ func main() {
 			uint16(cfg.Server.LogicalAddress),
 			uint16(cfg.Server.ClientLogicalAddressMin),
 			uint16(cfg.Server.ClientLogicalAddressMax),
+			cfg.ECUs,
 		)
 		errCh <- tcpServer.Listen()
 	}()
