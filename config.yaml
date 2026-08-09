@@ -36,3 +36,22 @@ ecu:
           name: extended
 
     tester_present: {}
+
+    security_access:
+      levels:
+        - level: 0x01             # requestSeed = 0x01, sendKey = 0x02
+          name: extended
+          access:
+            sessions: [0x03]
+          seed: "11 22 33 44"     # fixed seed; omit for a random seed of seed_length bytes
+          algorithm: xor          # xor | add | not | fixed | seed
+          secret: "AA BB CC DD"   # key = seed XOR secret = BB 99 FF 99
+          max_attempts: 3
+          lockout_ms: 10000
+        - level: 0x11
+          name: programming
+          access:
+            sessions: [0x02]
+          seed_length: 4
+          algorithm: add
+          secret: "12 34 56 78"

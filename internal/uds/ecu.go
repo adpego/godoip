@@ -31,7 +31,8 @@ type ECU struct {
 	sessions map[uint8]sessionInfo
 
 	// Security state.
-	security securityState
+	security       securityState
+	securityLevels map[uint8]*securityLevel
 }
 
 // Option customizes an ECU.
@@ -70,6 +71,7 @@ type serviceBuilder func(e *ECU, cfg config.ECU) (*service, error)
 
 var serviceBuilders = map[byte]serviceBuilder{
 	SIDDiagnosticSessionControl: buildSessionControl,
+	SIDSecurityAccess:           buildSecurityAccess,
 	SIDTesterPresent:            buildTesterPresent,
 }
 

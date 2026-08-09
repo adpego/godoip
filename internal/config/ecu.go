@@ -25,6 +25,7 @@ type Service struct {
 // with its default settings.
 type Services struct {
 	DiagnosticSessionControl *SessionControlService `yaml:"diagnostic_session_control"`
+	SecurityAccess           *SecurityAccessService `yaml:"security_access"`
 	TesterPresent            *Service               `yaml:"tester_present"`
 }
 
@@ -42,4 +43,24 @@ type Session struct {
 	P2Ms     int    `yaml:"p2_ms"`      // defaults to 50
 	P2StarMs int    `yaml:"p2_star_ms"` // defaults to 5000
 	Access   Access `yaml:"access"`
+}
+
+// SecurityAccessService configures SecurityAccess (0x27).
+type SecurityAccessService struct {
+	Service `yaml:",inline"`
+	Levels  []SecurityLevel `yaml:"levels"`
+}
+
+// SecurityLevel describes a seed/key level. Level is the requestSeed
+// sub-function (odd value); the matching sendKey sub-function is Level+1.
+type SecurityLevel struct {
+	Level       uint8  `yaml:"level"`
+	Name        string `yaml:"name"`
+	Access      Access `yaml:"access"`       // e.g. sessions in which the level can be unlocked
+	Seed        string `yaml:"seed"`         // fixed seed (hex); empty = random seed
+	SeedLength  int    `yaml:"seed_length"`  // random seed length; defaults to 4
+	Algorithm   string `yaml:"algorithm"`    // xor | add | not | fixed | seed; defaults to xor
+	Secret      string `yaml:"secret"`       // hex parameter of the key algorithm
+	MaxAttempts int    `yaml:"max_attempts"` // invalid keys before lockout; defaults to 3
+	LockoutMs   int    `yaml:"lockout_ms"`   // delay after exceeding attempts; defaults to 10000
 }
