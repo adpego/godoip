@@ -84,3 +84,35 @@ ecu:
 		t.Errorf("session access: got %v", got)
 	}
 }
+
+func TestParseDIDs(t *testing.T) {
+	cfg, err := Parse([]byte(`
+ecu:
+  dids:
+    - id: 0xF190
+      ascii: "VIN"
+      write:
+        sessions: [0x03]
+        security_levels: [0x01]
+    - id: 0x0100
+      hex: "01 02"
+      length: 2
+      volatile: true
+`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	dids := cfg.ECU.DIDs
+	if len(dids) != 2 {
+		t.Fatalf("got %d DIDs, want 2", len(dids))
+	}
+	if dids[0].ID != 0xF190 || dids[0].ASCII != "VIN" || dids[0].Read != nil {
+		t.Errorf("DID 0: got %+v", dids[0])
+	}
+	if w := dids[0].Write; w == nil || w.Sessions[0] != 0x03 || w.SecurityLevels[0] != 0x01 {
+		t.Errorf("DID 0 write access: got %+v", w)
+	}
+	if dids[1].Hex != "01 02" || dids[1].Length != 2 || !dids[1].Volatile || dids[1].Write != nil {
+		t.Errorf("DID 1: got %+v", dids[1])
+	}
+}

@@ -23,7 +23,7 @@ func main() {
 		log.Fatalf("invalid ECU config: %v", err)
 	}
 
-	announce, err := buildAnnouncement(cfg)
+	announce, err := buildAnnouncement(cfg, ecu)
 	if err != nil {
 		log.Fatalf("invalid announcement config: %v", err)
 	}
@@ -68,7 +68,17 @@ func buildTCPConfig(cfg *config.Config) transport.TCPConfig {
 	}
 }
 
-func buildAnnouncement(cfg *config.Config) (doip.AnnouncePayload, error) {
+// vinDID is the standard VIN data identifier, used when no VIN is configured.
+const vinDID = 0xF190
+
+func buildAnnouncement(cfg *config.Config, ecu *uds.ECU) (doip.AnnouncePayload, error) {
+	vin := cfg.Server.VIN
+	if vin == "" {
+		if v, ok := ecu.DID(vinDID); ok {
+			vin = string(v)
+		}
+	}
+
 	eid, err := parseHWAddr(cfg.Server.EID)
 	if err != nil {
 		return doip.AnnouncePayload{}, err
@@ -81,7 +91,7 @@ func buildAnnouncement(cfg *config.Config) (doip.AnnouncePayload, error) {
 
 	return doip.AnnouncePayload{
 		Version:        cfg.Server.DoIPVersion,
-		VIN:            cfg.Server.VIN,
+		VIN:            vin,
 		LogicalAddress: uint16(cfg.Server.LogicalAddress),
 		EID:            eid,
 		GID:            gid,

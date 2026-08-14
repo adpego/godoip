@@ -33,6 +33,10 @@ type ECU struct {
 	// Security state.
 	security       securityState
 	securityLevels map[uint8]*securityLevel
+
+	// Data identifiers.
+	dids           map[uint16]*did
+	maxDIDsPerRead int
 }
 
 // Option customizes an ECU.
@@ -72,6 +76,8 @@ type serviceBuilder func(e *ECU, cfg config.ECU) (*service, error)
 var serviceBuilders = map[byte]serviceBuilder{
 	SIDDiagnosticSessionControl: buildSessionControl,
 	SIDSecurityAccess:           buildSecurityAccess,
+	SIDReadDataByIdentifier:     buildReadDID,
+	SIDWriteDataByIdentifier:    buildWriteDID,
 	SIDTesterPresent:            buildTesterPresent,
 }
 
@@ -92,6 +98,11 @@ func NewECU(cfg config.ECU, opts ...Option) (*ECU, error) {
 	}
 	if cfg.S3TimeoutMs > 0 {
 		e.s3Timeout = time.Duration(cfg.S3TimeoutMs) * time.Millisecond
+	}
+
+	var err error
+	if e.dids, err = newDIDStore(cfg.DIDs); err != nil {
+		return nil, err
 	}
 
 	for _, sid := range slices.Sorted(maps.Keys(serviceBuilders)) {

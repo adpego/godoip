@@ -4,7 +4,7 @@ server:
   doip_version: 0x03
   logical_address: 0x0E80       # DoIP entity address = ECU physical address
   functional_address: 0xE400    # UDS functional address
-  vin: "WBA12345678901234"
+  vin: "WBA12345678901234"      # optional, defaults to the value of DID 0xF190
   eid: "00:1A:2B:3C:4D:5E"
   gid: "00:1A:2B:3C:4D:5F"
   client_logical_address_min: 0x07E0
@@ -55,3 +55,61 @@ ecu:
           seed_length: 4
           algorithm: add
           secret: "12 34 56 78"
+
+    read_data_by_identifier:
+      max_dids_per_request: 8
+
+    write_data_by_identifier:
+      access:
+        sessions: [0x02, 0x03]
+
+  # Data identifiers shared by ReadDataByIdentifier and WriteDataByIdentifier:
+  # a successful write changes the value returned by later reads.
+  #   ascii / hex      initial value
+  #   length           fixed size (writes must match); 0 = size of the value
+  #   variable_length  accept writes of any length
+  #   volatile         restore the initial value on ECU reset
+  #   read             access to read (omitted = always readable)
+  #   write            access to write (omitted = not writable)
+  dids:
+    - id: 0xF190
+      name: VIN
+      ascii: "WBA12345678901234"
+      write:
+        sessions: [0x03]
+        security_levels: [0x01]
+
+    - id: 0xF18C
+      name: ECU serial number
+      ascii: "ECU001"
+
+    - id: 0xF189
+      name: Software version
+      hex: "01 02 03"
+
+    - id: 0xF186
+      name: Active diagnostic session
+      hex: "01"
+      read:
+        sessions: [0x01, 0x03]
+
+    - id: 0x0100
+      name: Calibration value
+      hex: "00 64"
+      read:
+        sessions: [0x03]
+      write:
+        sessions: [0x03]
+
+    - id: 0x0101
+      name: Workshop name
+      ascii: "GODOIP"
+      variable_length: true
+      volatile: true
+      write: {}
+
+    - id: 0x0200
+      name: Secret data
+      length: 8
+      read:
+        security_levels: [0x01]

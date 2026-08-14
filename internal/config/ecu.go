@@ -5,6 +5,7 @@ type ECU struct {
 	Name        string   `yaml:"name"`
 	S3TimeoutMs int      `yaml:"s3_timeout_ms"` // non-default session timeout; defaults to 5000
 	Services    Services `yaml:"services"`
+	DIDs        []DID    `yaml:"dids"`
 }
 
 // Access describes the conditions under which an element (service, session,
@@ -27,6 +28,8 @@ type Services struct {
 	DiagnosticSessionControl *SessionControlService `yaml:"diagnostic_session_control"`
 	SecurityAccess           *SecurityAccessService `yaml:"security_access"`
 	TesterPresent            *Service               `yaml:"tester_present"`
+	ReadDataByIdentifier     *ReadDIDService        `yaml:"read_data_by_identifier"`
+	WriteDataByIdentifier    *Service               `yaml:"write_data_by_identifier"`
 }
 
 // SessionControlService configures DiagnosticSessionControl (0x10).
@@ -63,4 +66,23 @@ type SecurityLevel struct {
 	Secret      string `yaml:"secret"`       // hex parameter of the key algorithm
 	MaxAttempts int    `yaml:"max_attempts"` // invalid keys before lockout; defaults to 3
 	LockoutMs   int    `yaml:"lockout_ms"`   // delay after exceeding attempts; defaults to 10000
+}
+
+// ReadDIDService configures ReadDataByIdentifier (0x22).
+type ReadDIDService struct {
+	Service           `yaml:",inline"`
+	MaxDIDsPerRequest int `yaml:"max_dids_per_request"` // 0 = unlimited
+}
+
+// DID is a data identifier shared by ReadDataByIdentifier and
+// WriteDataByIdentifier: a successful write changes the value later read.
+type DID struct {
+	ID             uint16           `yaml:"id"`
+	Name           string           `yaml:"name"`
+	Data           `yaml:",inline"` // initial value
+	Length         int              `yaml:"length"`          // fixed size; 0 = size of the initial value. Empty value = zeros
+	VariableLength bool             `yaml:"variable_length"` // accept writes of any length
+	Volatile       bool             `yaml:"volatile"`        // restore the initial value on ECU reset
+	Read           *Access          `yaml:"read"`            // nil = readable in any session without security
+	Write          *Access          `yaml:"write"`           // nil = not writable
 }
