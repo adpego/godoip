@@ -26,6 +26,7 @@ type Service struct {
 // with its default settings.
 type Services struct {
 	DiagnosticSessionControl *SessionControlService `yaml:"diagnostic_session_control"`
+	ECUReset                 *ECUResetService       `yaml:"ecu_reset"`
 	SecurityAccess           *SecurityAccessService `yaml:"security_access"`
 	TesterPresent            *Service               `yaml:"tester_present"`
 	ReadDataByIdentifier     *ReadDIDService        `yaml:"read_data_by_identifier"`
@@ -46,6 +47,20 @@ type Session struct {
 	P2Ms     int    `yaml:"p2_ms"`      // defaults to 50
 	P2StarMs int    `yaml:"p2_star_ms"` // defaults to 5000
 	Access   Access `yaml:"access"`
+}
+
+// ECUResetService configures ECUReset (0x11).
+type ECUResetService struct {
+	Service    `yaml:",inline"`
+	ResetTypes []ResetType `yaml:"reset_types"` // empty = hard (0x01), keyOffOn (0x02) and soft (0x03)
+}
+
+// ResetType describes a supported ECUReset sub-function.
+type ResetType struct {
+	ID            uint8  `yaml:"id"`
+	Name          string `yaml:"name"`
+	Access        Access `yaml:"access"`
+	PowerDownTime uint8  `yaml:"power_down_time"` // seconds, only for enableRapidPowerShutDown (0x04)
 }
 
 // SecurityAccessService configures SecurityAccess (0x27).

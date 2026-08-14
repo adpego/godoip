@@ -37,6 +37,16 @@ ecu:
 
     tester_present: {}
 
+    ecu_reset:
+      reset_types:
+        - id: 0x01          # hardReset
+        - id: 0x03          # softReset
+        - id: 0x02          # keyOffOnReset
+          access:
+            sessions: [0x02, 0x03]
+        - id: 0x04          # enableRapidPowerShutDown
+          power_down_time: 10
+
     security_access:
       levels:
         - level: 0x01             # requestSeed = 0x01, sendKey = 0x02

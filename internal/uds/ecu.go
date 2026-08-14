@@ -27,8 +27,9 @@ type ECU struct {
 	lastActivity time.Time
 
 	// Session state.
-	session  uint8
-	sessions map[uint8]sessionInfo
+	session    uint8
+	sessions   map[uint8]sessionInfo
+	resetTypes map[uint8]config.ResetType
 
 	// Security state.
 	security       securityState
@@ -75,6 +76,7 @@ type serviceBuilder func(e *ECU, cfg config.ECU) (*service, error)
 
 var serviceBuilders = map[byte]serviceBuilder{
 	SIDDiagnosticSessionControl: buildSessionControl,
+	SIDECUReset:                 buildECUReset,
 	SIDSecurityAccess:           buildSecurityAccess,
 	SIDReadDataByIdentifier:     buildReadDID,
 	SIDWriteDataByIdentifier:    buildWriteDID,
