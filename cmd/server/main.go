@@ -7,7 +7,7 @@ import (
 	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/doip"
 	"github.com/adpego/godoip/internal/transport"
-	"github.com/adpego/godoip/internal/uds"
+	"github.com/adpego/godoip/internal/uds/services"
 )
 
 const defaultFunctionalAddress = 0xE400
@@ -18,12 +18,12 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	ecu, err := uds.NewECU(cfg.ECU)
+	ecu, err := services.New(cfg.ECU)
 	if err != nil {
 		log.Fatalf("invalid ECU config: %v", err)
 	}
 
-	announce, err := buildAnnouncement(cfg, ecu)
+	announce, err := buildAnnouncement(cfg)
 	if err != nil {
 		log.Fatalf("invalid announcement config: %v", err)
 	}
@@ -68,15 +68,27 @@ func buildTCPConfig(cfg *config.Config) transport.TCPConfig {
 	}
 }
 
+// announcedVIN returns the configured VIN, or the initial value of DID 0xF190.
+func announcedVIN(cfg *config.Config) (string, error) {
+	if cfg.Server.VIN != "" {
+		return cfg.Server.VIN, nil
+	}
+	for _, d := range cfg.ECU.DIDs {
+		if d.ID == vinDID {
+			v, err := d.Bytes()
+			return string(v), err
+		}
+	}
+	return "", nil
+}
+
 // vinDID is the standard VIN data identifier, used when no VIN is configured.
 const vinDID = 0xF190
 
-func buildAnnouncement(cfg *config.Config, ecu *uds.ECU) (doip.AnnouncePayload, error) {
-	vin := cfg.Server.VIN
-	if vin == "" {
-		if v, ok := ecu.DID(vinDID); ok {
-			vin = string(v)
-		}
+func buildAnnouncement(cfg *config.Config) (doip.AnnouncePayload, error) {
+	vin, err := announcedVIN(cfg)
+	if err != nil {
+		return doip.AnnouncePayload{}, err
 	}
 
 	eid, err := parseHWAddr(cfg.Server.EID)

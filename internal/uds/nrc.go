@@ -26,24 +26,24 @@ const (
 	NRCServiceNotSupportedInActiveSession     byte = 0x7F
 
 	// Vehicle manufacturer / conditions specific
-	NRCRpmTooHigh                             byte = 0x81
-	NRCRpmTooLow                              byte = 0x82
-	NRCEngineRunning                          byte = 0x83
-	NRCEngineNotRunning                       byte = 0x84
-	NRCEngineRunTimeTooLow                    byte = 0x85
-	NRCTemperatureTooHigh                     byte = 0x86
-	NRCTemperatureTooLow                      byte = 0x87
-	NRCSpeedTooHigh                           byte = 0x88
-	NRCSpeedTooLow                            byte = 0x89
-	NRCThrottleTooHigh                        byte = 0x8A
-	NRCThrottleTooLow                         byte = 0x8B
-	NRCTransmissionRangeNotInNeutral          byte = 0x8C
-	NRCTransmissionRangeNotInGear             byte = 0x8D
-	NRCBrakeSwitchNotClosed                   byte = 0x8F
-	NRCShifterNotInPark                       byte = 0x90
-	NRCTorqueConverterClutchLocked            byte = 0x91
-	NRCVoltageTooHigh                         byte = 0x92
-	NRCVoltageTooLow                          byte = 0x93
+	NRCRpmTooHigh                    byte = 0x81
+	NRCRpmTooLow                     byte = 0x82
+	NRCEngineRunning                 byte = 0x83
+	NRCEngineNotRunning              byte = 0x84
+	NRCEngineRunTimeTooLow           byte = 0x85
+	NRCTemperatureTooHigh            byte = 0x86
+	NRCTemperatureTooLow             byte = 0x87
+	NRCSpeedTooHigh                  byte = 0x88
+	NRCSpeedTooLow                   byte = 0x89
+	NRCThrottleTooHigh               byte = 0x8A
+	NRCThrottleTooLow                byte = 0x8B
+	NRCTransmissionRangeNotInNeutral byte = 0x8C
+	NRCTransmissionRangeNotInGear    byte = 0x8D
+	NRCBrakeSwitchNotClosed          byte = 0x8F
+	NRCShifterNotInPark              byte = 0x90
+	NRCTorqueConverterClutchLocked   byte = 0x91
+	NRCVoltageTooHigh                byte = 0x92
+	NRCVoltageTooLow                 byte = 0x93
 
 	// Manufacturer specific (0xF0–0xFE)
 	NRCManufacturerSpecificF0 byte = 0xF0

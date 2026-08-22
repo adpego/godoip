@@ -2,21 +2,28 @@ package uds
 
 // Service identifiers (ISO 14229-1).
 const (
-	SIDDiagnosticSessionControl   byte = 0x10
-	SIDECUReset                   byte = 0x11
-	SIDClearDiagnosticInformation byte = 0x14
-	SIDReadDTCInformation         byte = 0x19
-	SIDReadDataByIdentifier       byte = 0x22
-	SIDSecurityAccess             byte = 0x27
-	SIDCommunicationControl       byte = 0x28
-	SIDWriteDataByIdentifier      byte = 0x2E
-	SIDRoutineControl             byte = 0x31
-	SIDTesterPresent              byte = 0x3E
-	SIDControlDTCSetting          byte = 0x85
+	SIDDiagnosticSessionControl       byte = 0x10
+	SIDECUReset                       byte = 0x11
+	SIDClearDiagnosticInformation     byte = 0x14
+	SIDReadDTCInformation             byte = 0x19
+	SIDReadDataByIdentifier           byte = 0x22
+	SIDReadMemoryByAddress            byte = 0x23
+	SIDSecurityAccess                 byte = 0x27
+	SIDCommunicationControl           byte = 0x28
+	SIDWriteDataByIdentifier          byte = 0x2E
+	SIDInputOutputControlByIdentifier byte = 0x2F
+	SIDRoutineControl                 byte = 0x31
+	SIDRequestDownload                byte = 0x34
+	SIDRequestUpload                  byte = 0x35
+	SIDTransferData                   byte = 0x36
+	SIDRequestTransferExit            byte = 0x37
+	SIDWriteMemoryByAddress           byte = 0x3D
+	SIDTesterPresent                  byte = 0x3E
+	SIDControlDTCSetting              byte = 0x85
 
-	negativeResponseSID byte = 0x7F
-	positiveResponseBit byte = 0x40
-	suppressPosRspBit   byte = 0x80
+	NegativeResponseSID byte = 0x7F
+	PositiveResponseBit byte = 0x40
+	SuppressPosRspBit   byte = 0x80
 )
 
 // Diagnostic sessions (ISO 14229-1).

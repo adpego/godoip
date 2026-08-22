@@ -1,4 +1,4 @@
-package uds
+package security
 
 import "fmt"
 
@@ -15,7 +15,7 @@ var keyAlgorithms = map[string]KeyAlgorithm{
 }
 
 // RegisterKeyAlgorithm makes a custom algorithm available to configurations.
-// It must be called before NewECU.
+// It must be called before the ECU is built.
 func RegisterKeyAlgorithm(name string, alg KeyAlgorithm) {
 	keyAlgorithms[name] = alg
 }
