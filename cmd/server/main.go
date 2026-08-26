@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net"
 
@@ -13,7 +14,10 @@ import (
 const defaultFunctionalAddress = 0xE400
 
 func main() {
-	cfg, err := config.Load("config.yaml")
+	configPath := flag.String("config", "config.yaml", "path to the configuration file")
+	flag.Parse()
+
+	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}

@@ -1,0 +1,68 @@
+# Configuration used by the end-to-end tests. Keep it in sync with the tests.
+server:
+  tcp_port: 13410
+  udp_port: 13410
+  doip_version: 0x02
+  logical_address: 0x0E80
+  functional_address: 0xE400
+  eid: "00:1A:2B:3C:4D:5E"
+  gid: "00:1A:2B:3C:4D:5F"
+  client_logical_address_min: 0x0E00
+  client_logical_address_max: 0x0E0F
+
+ecu:
+  name: "E2E ECU"
+  s3_timeout_ms: 4000
+
+  services:
+    diagnostic_session_control:
+      sessions:
+        - id: 0x01
+        - id: 0x02
+          access:
+            sessions: [0x03]
+        - id: 0x03
+          p2_ms: 25
+          p2_star_ms: 2000
+
+    ecu_reset:
+      reset_types:
+        - id: 0x01
+        - id: 0x03
+        - id: 0x04
+          power_down_time: 10
+
+    security_access:
+      levels:
+        - level: 0x01
+          access:
+            sessions: [0x03]
+          seed: "11 22 33 44"
+          algorithm: xor
+          secret: "AA BB CC DD"
+          max_attempts: 2
+          lockout_ms: 1000
+
+    tester_present: {}
+
+    read_data_by_identifier: {}
+
+    write_data_by_identifier: {}
+
+  dids:
+    - id: 0xF190
+      ascii: "WBA12345678901234"
+    - id: 0xF189
+      hex: "01 02 03"
+    - id: 0x0100
+      hex: "00 64"
+      read:
+        sessions: [0x03]
+      write:
+        sessions: [0x03]
+        security_levels: [0x01]
+    - id: 0x0101
+      ascii: "GODOIP"
+      variable_length: true
+      volatile: true
+      write: {}
