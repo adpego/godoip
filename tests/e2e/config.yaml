@@ -49,6 +49,10 @@ ecu:
 
     write_data_by_identifier: {}
 
+    read_memory_by_address: {}
+
+    write_memory_by_address: {}
+
   dids:
     - id: 0xF190
       ascii: "WBA12345678901234"
@@ -66,3 +70,18 @@ ecu:
       variable_length: true
       volatile: true
       write: {}
+
+  memory:
+    file: firmware.s19
+    output_file: firmware.out.s19
+    regions:
+      - name: code
+        start: 0x010000
+        size: 0x100
+        write: {}
+      - name: calibration
+        start: 0x020000
+        size: 0x100
+        write:
+          sessions: [0x03]
+          security_levels: [0x01]

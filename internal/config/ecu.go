@@ -6,6 +6,7 @@ type ECU struct {
 	S3TimeoutMs int      `yaml:"s3_timeout_ms"` // non-default session timeout; defaults to 5000
 	Services    Services `yaml:"services"`
 	DIDs        []DID    `yaml:"dids"`
+	Memory      *Memory  `yaml:"memory"`
 }
 
 // Access describes the conditions under which an element (service, session,
@@ -31,6 +32,8 @@ type Services struct {
 	TesterPresent            *Service               `yaml:"tester_present"`
 	ReadDataByIdentifier     *ReadDIDService        `yaml:"read_data_by_identifier"`
 	WriteDataByIdentifier    *Service               `yaml:"write_data_by_identifier"`
+	ReadMemoryByAddress      *ReadMemoryService     `yaml:"read_memory_by_address"`
+	WriteMemoryByAddress     *Service               `yaml:"write_memory_by_address"`
 }
 
 // SessionControlService configures DiagnosticSessionControl (0x10).

@@ -6,6 +6,7 @@ shared between tests, so some tests may fail).
 """
 
 import os
+import shutil
 import socket
 import subprocess
 import time
@@ -18,7 +19,9 @@ from doipclient.connectors import DoIPClientUDSConnector
 from udsoncan.client import Client
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG = Path(__file__).with_name("config.yaml")
+E2E_DIR = Path(__file__).resolve().parent
+# Files copied to the per-test working directory of the server.
+SERVER_FILES = ["config.yaml", "firmware.s19"]
 
 TCP_PORT = 13410
 ECU_ADDRESS = 0x0E80
@@ -55,9 +58,11 @@ def server(server_binary, tmp_path):
         yield host
         return
 
+    for name in SERVER_FILES:
+        shutil.copy(E2E_DIR / name, tmp_path / name)
     log = open(tmp_path / "server.log", "w")
     proc = subprocess.Popen(
-        [str(server_binary), "-config", str(CONFIG)],
+        [str(server_binary), "-config", str(tmp_path / "config.yaml")],
         cwd=tmp_path, stdout=log, stderr=subprocess.STDOUT,
     )
     try:
@@ -67,6 +72,12 @@ def server(server_binary, tmp_path):
         proc.terminate()
         proc.wait(timeout=5)
         log.close()
+
+
+@pytest.fixture
+def workdir(server, tmp_path):
+    """Directory holding the server configuration and memory files."""
+    return tmp_path
 
 
 @pytest.fixture

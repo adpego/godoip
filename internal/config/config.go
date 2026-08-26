@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,7 +30,15 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Parse(data)
+	cfg, err := Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	// File paths in the configuration are relative to the configuration file.
+	if cfg.ECU.Memory != nil {
+		cfg.ECU.Memory.resolvePaths(filepath.Dir(path))
+	}
+	return cfg, nil
 }
 
 // Parse decodes a YAML configuration document.

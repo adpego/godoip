@@ -73,6 +73,13 @@ ecu:
       access:
         sessions: [0x02, 0x03]
 
+    read_memory_by_address:
+      max_read_size: 1024
+
+    write_memory_by_address:
+      access:
+        sessions: [0x02, 0x03]
+
   # Data identifiers shared by ReadDataByIdentifier and WriteDataByIdentifier:
   # a successful write changes the value returned by later reads.
   #   ascii / hex      initial value
@@ -123,3 +130,31 @@ ecu:
       length: 8
       read:
         security_levels: [0x01]
+
+  # ECU memory used by ReadMemoryByAddress / WriteMemoryByAddress.
+  # The input file is never modified: writes go to output_file.
+  # Paths are relative to this configuration file.
+  memory:
+    file: firmware/engine_ecu.s19      # .s19/.s28/.s37/.srec, .hex (Intel HEX) or .bin
+    # format: srec                     # srec | ihex | bin (default: detect)
+    # base_address: 0x0                # load address of .bin files
+    output_file: firmware/engine_ecu.out.s19
+    # output_format: ihex              # default: same as the input file
+    resume_from_output: false          # true: start from output_file if it exists
+    fill: 0xFF                         # value of bytes missing from the file
+    # Without regions, every segment of the file is readable and writable.
+    regions:
+      - name: code
+        start: 0x010000
+        size: 0x10000
+        write:
+          sessions: [0x02]
+          security_levels: [0x11]
+      - name: calibration
+        start: 0x020000
+        size: 0x1000
+        read:
+          sessions: [0x01, 0x03]
+        write:
+          sessions: [0x03]
+          security_levels: [0x01]
