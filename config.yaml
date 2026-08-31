@@ -80,6 +80,8 @@ ecu:
       access:
         sessions: [0x02, 0x03]
 
+    routine_control: {}
+
   # Data identifiers shared by ReadDataByIdentifier and WriteDataByIdentifier:
   # a successful write changes the value returned by later reads.
   #   ascii / hex      initial value
@@ -130,6 +132,61 @@ ecu:
       length: 8
       read:
         security_levels: [0x01]
+
+  # Routines for RoutineControl. Each action (start/stop/results) is optional:
+  #   access            extra access for this action
+  #   option_length     exact length of routineControlOptionRecord
+  #   response          routineStatusRecord (ascii/hex)
+  #   running_response  results only: response while the routine is running
+  #   cases             responses (or NRCs) depending on the option record
+  #   effects           start only: erase_memory / set_did
+  routines:
+    - id: 0x0203
+      name: Check programming preconditions
+      start:
+        response: {hex: "00"}
+      results:
+        response: {hex: "00"}
+
+    - id: 0xFF00
+      name: Erase memory
+      access:
+        sessions: [0x02]
+        security_levels: [0x11]
+      duration_ms: 2000
+      start:
+        option_length: 8          # 4-byte address + 4-byte size
+        response: {hex: "00"}
+        effects:
+          - erase_memory: {start: 0x010000, size: 0x100}
+      results:
+        running_response: {hex: "01"}   # in progress
+        response: {hex: "00"}           # correct
+
+    - id: 0xFF01
+      name: Check memory
+      access:
+        sessions: [0x02]
+      start:
+        response: {hex: "00"}
+        cases:
+          - request: {hex: "DE AD BE EF"}
+            response: {hex: "01"}     # incorrect CRC
+          - request: {hex: "00 00 00 00"}
+            nrc: 0x31
+
+    - id: 0x0300
+      name: Actuator test
+      access:
+        sessions: [0x03]
+      start:
+        effects:
+          - set_did: {id: 0x0101, ascii: "ACTIVE"}
+      stop:
+        response: {hex: "00"}
+      results:
+        running_response: {hex: "01"}
+        response: {hex: "00"}
 
   # ECU memory used by ReadMemoryByAddress / WriteMemoryByAddress.
   # The input file is never modified: writes go to output_file.

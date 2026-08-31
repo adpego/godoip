@@ -2,11 +2,12 @@ package config
 
 // ECU describes the single ECU simulated behind the DoIP entity.
 type ECU struct {
-	Name        string   `yaml:"name"`
-	S3TimeoutMs int      `yaml:"s3_timeout_ms"` // non-default session timeout; defaults to 5000
-	Services    Services `yaml:"services"`
-	DIDs        []DID    `yaml:"dids"`
-	Memory      *Memory  `yaml:"memory"`
+	Name        string    `yaml:"name"`
+	S3TimeoutMs int       `yaml:"s3_timeout_ms"` // non-default session timeout; defaults to 5000
+	Services    Services  `yaml:"services"`
+	DIDs        []DID     `yaml:"dids"`
+	Memory      *Memory   `yaml:"memory"`
+	Routines    []Routine `yaml:"routines"`
 }
 
 // Access describes the conditions under which an element (service, session,
@@ -34,6 +35,7 @@ type Services struct {
 	WriteDataByIdentifier    *Service               `yaml:"write_data_by_identifier"`
 	ReadMemoryByAddress      *ReadMemoryService     `yaml:"read_memory_by_address"`
 	WriteMemoryByAddress     *Service               `yaml:"write_memory_by_address"`
+	RoutineControl           *Service               `yaml:"routine_control"`
 }
 
 // SessionControlService configures DiagnosticSessionControl (0x10).

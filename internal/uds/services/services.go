@@ -14,6 +14,7 @@ import (
 	"github.com/adpego/godoip/internal/uds/services/did"
 	"github.com/adpego/godoip/internal/uds/services/ecureset"
 	"github.com/adpego/godoip/internal/uds/services/memory"
+	"github.com/adpego/godoip/internal/uds/services/routine"
 	"github.com/adpego/godoip/internal/uds/services/security"
 	"github.com/adpego/godoip/internal/uds/services/session"
 	"github.com/adpego/godoip/internal/uds/services/testerpresent"
@@ -49,6 +50,9 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 		{"write_data_by_identifier", func() error { return did.RegisterWrite(e, svc.WriteDataByIdentifier, dids) }},
 		{"read_memory_by_address", func() error { return memory.RegisterRead(e, svc.ReadMemoryByAddress, mem) }},
 		{"write_memory_by_address", func() error { return memory.RegisterWrite(e, svc.WriteMemoryByAddress, mem) }},
+		{"routine_control", func() error {
+			return routine.Register(e, svc.RoutineControl, cfg.Routines, routine.Deps{DIDs: dids, Memory: mem})
+		}},
 	}
 	for _, s := range steps {
 		if err := s.run(); err != nil {

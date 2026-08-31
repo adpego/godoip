@@ -158,3 +158,13 @@ func (m *Memory) Flush() error {
 	m.dirty = false
 	return nil
 }
+
+// Erase fills [addr, addr+size) with the fill value and persists it.
+func (m *Memory) Erase(addr, size uint32) error {
+	data := make([]byte, size)
+	for i := range data {
+		data[i] = m.fill
+	}
+	m.Write(addr, data)
+	return m.Flush()
+}

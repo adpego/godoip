@@ -53,6 +53,8 @@ ecu:
 
     write_memory_by_address: {}
 
+    routine_control: {}
+
   dids:
     - id: 0xF190
       ascii: "WBA12345678901234"
@@ -70,6 +72,31 @@ ecu:
       variable_length: true
       volatile: true
       write: {}
+
+  routines:
+    - id: 0xFF00
+      access:
+        sessions: [0x03]
+      duration_ms: 1000
+      start:
+        response: {hex: "00"}
+        effects:
+          - erase_memory: {start: 0x010000, size: 0x10}
+      results:
+        running_response: {hex: "01"}
+        response: {hex: "00"}
+    - id: 0x0300
+      start:
+        effects:
+          - set_did: {id: 0x0101, ascii: "ACTIVE"}
+      stop: {}
+    - id: 0xFF01
+      start:
+        option_length: 4
+        response: {hex: "00"}
+        cases:
+          - request: {hex: "DE AD BE EF"}
+            response: {hex: "01"}
 
   memory:
     file: firmware.s19
