@@ -10,6 +10,7 @@ import (
 	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/uds"
 	"github.com/adpego/godoip/internal/uds/services/did"
+	"github.com/adpego/godoip/internal/uds/services/dtc"
 	"github.com/adpego/godoip/internal/uds/services/memory"
 )
 
@@ -20,9 +21,10 @@ const (
 	RequestRoutineResults uint8 = 0x03
 )
 
-// Deps are the shared stores routine effects can act on. Both are optional.
+// Deps are the shared stores routine effects can act on. All are optional.
 type Deps struct {
 	DIDs   *did.Store
+	DTCs   *dtc.Store
 	Memory *memory.Memory
 }
 
@@ -157,15 +159,25 @@ func newAction(c config.RoutineAction, deps Deps) (*action, error) {
 }
 
 func newEffect(c config.RoutineEffect, deps Deps) (effect, error) {
+	set := 0
+	for _, isSet := range []bool{c.EraseMemory != nil, c.SetDID != nil, c.SetDTC != nil} {
+		if isSet {
+			set++
+		}
+	}
+	if set != 1 {
+		return nil, fmt.Errorf("exactly one of erase_memory, set_did and set_dtc must be set")
+	}
+
 	switch {
-	case c.EraseMemory != nil && c.SetDID == nil:
+	case c.EraseMemory != nil:
 		if deps.Memory == nil {
 			return nil, fmt.Errorf("erase_memory requires an ecu.memory configuration")
 		}
 		rng := *c.EraseMemory
 		return func() error { return deps.Memory.Erase(rng.Start, rng.Size) }, nil
 
-	case c.SetDID != nil && c.EraseMemory == nil:
+	case c.SetDID != nil:
 		value, err := c.SetDID.Bytes()
 		if err != nil {
 			return nil, err
@@ -175,8 +187,14 @@ func newEffect(c config.RoutineEffect, deps Deps) (effect, error) {
 		}
 		id := c.SetDID.ID
 		return func() error { deps.DIDs.Set(id, value); return nil }, nil
+
+	default:
+		if deps.DTCs == nil || deps.DTCs.Get(c.SetDTC.Code) == nil {
+			return nil, fmt.Errorf("set_dtc: unknown DTC 0x%06X", c.SetDTC.Code)
+		}
+		st := *c.SetDTC
+		return func() error { deps.DTCs.SetStatus(st.Code, st.Status); return nil }, nil
 	}
-	return nil, fmt.Errorf("exactly one of erase_memory and set_did must be set")
 }
 
 func handle(c *uds.Context, req uds.Request, routines map[uint16]*routine) []byte {

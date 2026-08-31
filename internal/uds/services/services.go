@@ -12,6 +12,7 @@ import (
 	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/uds"
 	"github.com/adpego/godoip/internal/uds/services/did"
+	"github.com/adpego/godoip/internal/uds/services/dtc"
 	"github.com/adpego/godoip/internal/uds/services/ecureset"
 	"github.com/adpego/godoip/internal/uds/services/memory"
 	"github.com/adpego/godoip/internal/uds/services/routine"
@@ -36,6 +37,10 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dids: %w", err)
 	}
+	dtcs, err := dtc.NewStore(e, cfg.DTCs)
+	if err != nil {
+		return nil, fmt.Errorf("dtcs: %w", err)
+	}
 	mem, err := memory.New(cfg.Memory)
 	if err != nil {
 		return nil, fmt.Errorf("memory: %w", err)
@@ -50,8 +55,11 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 		{"write_data_by_identifier", func() error { return did.RegisterWrite(e, svc.WriteDataByIdentifier, dids) }},
 		{"read_memory_by_address", func() error { return memory.RegisterRead(e, svc.ReadMemoryByAddress, mem) }},
 		{"write_memory_by_address", func() error { return memory.RegisterWrite(e, svc.WriteMemoryByAddress, mem) }},
+		{"read_dtc_information", func() error { return dtc.RegisterRead(e, svc.ReadDTCInformation, dtcs) }},
+		{"clear_diagnostic_information", func() error { return dtc.RegisterClear(e, svc.ClearDiagnosticInfo, dtcs) }},
+		{"control_dtc_setting", func() error { return dtc.RegisterSetting(e, svc.ControlDTCSetting, dtcs) }},
 		{"routine_control", func() error {
-			return routine.Register(e, svc.RoutineControl, cfg.Routines, routine.Deps{DIDs: dids, Memory: mem})
+			return routine.Register(e, svc.RoutineControl, cfg.Routines, routine.Deps{DIDs: dids, DTCs: dtcs, Memory: mem})
 		}},
 	}
 	for _, s := range steps {

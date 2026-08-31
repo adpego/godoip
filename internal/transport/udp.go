@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	broadcastAddr      = "255.255.255.255"
-	announcementCount  = 3
-	announcementDelay  = 500 * time.Millisecond
+	broadcastAddr     = "255.255.255.255"
+	announcementCount = 3
+	announcementDelay = 500 * time.Millisecond
 )
 
 type UDPServer struct {
-	port    int
+	port     int
 	announce doip.AnnouncePayload
 }
 

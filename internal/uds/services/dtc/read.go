@@ -1,0 +1,255 @@
+package dtc
+
+import (
+	"fmt"
+
+	"github.com/adpego/godoip/internal/config"
+	"github.com/adpego/godoip/internal/uds"
+)
+
+// ReadDTCInformation report types (ISO 14229-1).
+const (
+	ReportNumberOfDTCByStatusMask      uint8 = 0x01
+	ReportDTCByStatusMask              uint8 = 0x02
+	ReportDTCSnapshotIdentification    uint8 = 0x03
+	ReportDTCSnapshotRecordByDTCNumber uint8 = 0x04
+	ReportDTCExtDataRecordByDTCNumber  uint8 = 0x06
+	ReportSupportedDTC                 uint8 = 0x0A
+	ReportFirstTestFailedDTC           uint8 = 0x0B
+	ReportFirstConfirmedDTC            uint8 = 0x0C
+	ReportMostRecentTestFailedDTC      uint8 = 0x0D
+	ReportMostRecentConfirmedDTC       uint8 = 0x0E
+	ReportDTCFaultDetectionCounter     uint8 = 0x14
+	ReportDTCWithPermanentStatus       uint8 = 0x15
+)
+
+const (
+	dtcFormatISO14229         uint8 = 0x01
+	statusTestFailed          uint8 = 0x01
+	statusConfirmedDTC        uint8 = 0x08
+	allRecords                uint8 = 0xFF
+	allOBDExtendedDataRecords uint8 = 0xFE
+	firstOBDRecord            uint8 = 0x90
+	lastOBDRecord             uint8 = 0xEF
+)
+
+type reader struct {
+	store        *Store
+	availability uint8
+	format       uint8
+	reports      map[uint8]config.Access
+}
+
+// reportHandler builds the response data (after SID+0x40 and sub-function)
+// or returns an NRC.
+type reportHandler func(r *reader, req uds.Request) ([]byte, byte)
+
+var reports = map[uint8]struct {
+	length int // exact request length, SID included
+	handle reportHandler
+}{
+	ReportNumberOfDTCByStatusMask:      {3, (*reader).numberByStatusMask},
+	ReportDTCByStatusMask:              {3, (*reader).byStatusMask},
+	ReportDTCSnapshotIdentification:    {2, (*reader).snapshotIdentification},
+	ReportDTCSnapshotRecordByDTCNumber: {6, (*reader).snapshotRecord},
+	ReportDTCExtDataRecordByDTCNumber:  {6, (*reader).extendedDataRecord},
+	ReportSupportedDTC:                 {2, (*reader).supported},
+	ReportFirstTestFailedDTC:           {2, chronological(statusTestFailed, false)},
+	ReportFirstConfirmedDTC:            {2, chronological(statusConfirmedDTC, false)},
+	ReportMostRecentTestFailedDTC:      {2, chronological(statusTestFailed, true)},
+	ReportMostRecentConfirmedDTC:       {2, chronological(statusConfirmedDTC, true)},
+	ReportDTCFaultDetectionCounter:     {2, (*reader).faultDetectionCounter},
+	ReportDTCWithPermanentStatus:       {2, (*reader).permanent},
+}
+
+// RegisterRead adds ReadDTCInformation (0x19) to e. A nil cfg disables it.
+func RegisterRead(e *uds.ECU, cfg *config.ReadDTCService, store *Store) error {
+	if cfg == nil {
+		return nil
+	}
+	r := &reader{store: store, availability: 0xFF, format: dtcFormatISO14229, reports: map[uint8]config.Access{}}
+	if cfg.StatusAvailabilityMask != nil {
+		r.availability = *cfg.StatusAvailabilityMask
+	}
+	if cfg.DTCFormat != nil {
+		r.format = *cfg.DTCFormat
+	}
+	if len(cfg.ReportTypes) == 0 {
+		for id := range reports {
+			r.reports[id] = config.Access{}
+		}
+	}
+	for _, rt := range cfg.ReportTypes {
+		if _, ok := reports[rt.ID]; !ok {
+			return fmt.Errorf("report type 0x%02X is not implemented", rt.ID)
+		}
+		if _, dup := r.reports[rt.ID]; dup {
+			return fmt.Errorf("duplicate report type 0x%02X", rt.ID)
+		}
+		r.reports[rt.ID] = rt.Access
+	}
+
+	return e.Register(uds.Service{
+		SID:            uds.SIDReadDTCInformation,
+		Access:         cfg.Access,
+		MinLength:      2,
+		HasSubFunction: true,
+		Handle:         r.handle,
+	})
+}
+
+func (r *reader) handle(c *uds.Context, req uds.Request) []byte {
+	access, ok := r.reports[req.SubFunction]
+	if !ok {
+		return uds.NegativeResponse(req.SID, uds.NRCSubFunctionNotSupported)
+	}
+	if nrc := c.CheckAccess(access, uds.NRCSubFunctionNotSupportedInActiveSession); nrc != 0 {
+		return uds.NegativeResponse(req.SID, nrc)
+	}
+	report := reports[req.SubFunction]
+	if len(req.Data) != report.length {
+		return uds.NegativeResponse(req.SID, uds.NRCInvalidMessageLengthOrFormat)
+	}
+	data, nrc := report.handle(r, req)
+	if nrc != 0 {
+		return uds.NegativeResponse(req.SID, nrc)
+	}
+	return uds.PositiveResponse(req.SID, append([]byte{req.SubFunction}, data...)...)
+}
+
+// status returns the status of d as reported (masked by availability).
+func (r *reader) status(d *DTC) uint8 { return d.Status & r.availability }
+
+func (r *reader) matching(mask uint8) []*DTC {
+	var out []*DTC
+	for _, d := range r.store.All() {
+		if r.status(d)&mask != 0 {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func (r *reader) dtcAndStatus(dtcs []*DTC) []byte {
+	out := []byte{r.availability}
+	for _, d := range dtcs {
+		out = append(out, d.codeBytes()...)
+		out = append(out, r.status(d))
+	}
+	return out
+}
+
+func (r *reader) numberByStatusMask(req uds.Request) ([]byte, byte) {
+	n := len(r.matching(req.Data[2]))
+	return []byte{r.availability, r.format, byte(n >> 8), byte(n)}, 0
+}
+
+func (r *reader) byStatusMask(req uds.Request) ([]byte, byte) {
+	return r.dtcAndStatus(r.matching(req.Data[2])), 0
+}
+
+func (r *reader) supported(uds.Request) ([]byte, byte) {
+	return r.dtcAndStatus(r.store.All()), 0
+}
+
+func (r *reader) permanent(uds.Request) ([]byte, byte) {
+	var dtcs []*DTC
+	for _, d := range r.store.All() {
+		if d.Permanent {
+			dtcs = append(dtcs, d)
+		}
+	}
+	return r.dtcAndStatus(dtcs), 0
+}
+
+// chronological reports the first or most recent DTC with a status bit set.
+func chronological(bit uint8, mostRecent bool) reportHandler {
+	return func(r *reader, _ uds.Request) ([]byte, byte) {
+		dtcs := r.store.All()
+		for i := range dtcs {
+			d := dtcs[i]
+			if mostRecent {
+				d = dtcs[len(dtcs)-1-i]
+			}
+			if r.status(d)&bit != 0 {
+				return r.dtcAndStatus([]*DTC{d}), 0
+			}
+		}
+		return r.dtcAndStatus(nil), 0
+	}
+}
+
+// faultDetectionCounter reports DTCs with a positive counter that have not
+// matured yet (ISO 14229-1, 11.3.5.13).
+func (r *reader) faultDetectionCounter(uds.Request) ([]byte, byte) {
+	var out []byte
+	for _, d := range r.store.All() {
+		if d.FaultDetectionCounter > 0 && d.FaultDetectionCounter < 0x7F {
+			out = append(out, d.codeBytes()...)
+			out = append(out, byte(d.FaultDetectionCounter))
+		}
+	}
+	return out, 0
+}
+
+func (r *reader) snapshotIdentification(uds.Request) ([]byte, byte) {
+	var out []byte
+	for _, d := range r.store.All() {
+		for _, s := range d.snapshots {
+			out = append(out, d.codeBytes()...)
+			out = append(out, s.number)
+		}
+	}
+	return out, 0
+}
+
+// lookup decodes DTCMaskRecord (3 bytes) and the record number.
+func (r *reader) lookup(req uds.Request) (*DTC, uint8, byte) {
+	code := uint32(req.Data[2])<<16 | uint32(req.Data[3])<<8 | uint32(req.Data[4])
+	d := r.store.Get(code)
+	if d == nil {
+		return nil, 0, uds.NRCRequestOutOfRange
+	}
+	return d, req.Data[5], 0
+}
+
+func (r *reader) snapshotRecord(req uds.Request) ([]byte, byte) {
+	d, number, nrc := r.lookup(req)
+	if nrc != 0 {
+		return nil, nrc
+	}
+	out := append(d.codeBytes(), r.status(d))
+	found := false
+	for _, s := range d.snapshots {
+		if number == allRecords || number == s.number {
+			out = append(out, s.number)
+			out = append(out, s.data...)
+			found = true
+		}
+	}
+	if !found && number != allRecords {
+		return nil, uds.NRCRequestOutOfRange
+	}
+	return out, 0
+}
+
+func (r *reader) extendedDataRecord(req uds.Request) ([]byte, byte) {
+	d, number, nrc := r.lookup(req)
+	if nrc != 0 {
+		return nil, nrc
+	}
+	out := append(d.codeBytes(), r.status(d))
+	found := false
+	for _, x := range d.extendedData {
+		obd := x.number >= firstOBDRecord && x.number <= lastOBDRecord
+		if number == allRecords || number == x.number || (number == allOBDExtendedDataRecords && obd) {
+			out = append(out, x.number)
+			out = append(out, x.data...)
+			found = true
+		}
+	}
+	if !found && number != allRecords && number != allOBDExtendedDataRecords {
+		return nil, uds.NRCRequestOutOfRange
+	}
+	return out, 0
+}

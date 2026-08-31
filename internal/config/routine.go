@@ -36,6 +36,13 @@ type RoutineCase struct {
 type RoutineEffect struct {
 	EraseMemory *MemoryRange `yaml:"erase_memory"` // fill a memory range with the fill value
 	SetDID      *DIDValue    `yaml:"set_did"`      // change the value of a DID
+	SetDTC      *DTCStatus   `yaml:"set_dtc"`      // change a DTC status (ignored while DTC setting is off)
+}
+
+// DTCStatus is a status for a DTC.
+type DTCStatus struct {
+	Code   uint32 `yaml:"code"`
+	Status uint8  `yaml:"status"`
 }
 
 // MemoryRange is an address range.

@@ -55,6 +55,12 @@ ecu:
 
     routine_control: {}
 
+    read_dtc_information: {}
+
+    clear_diagnostic_information: {}
+
+    control_dtc_setting: {}
+
   dids:
     - id: 0xF190
       ascii: "WBA12345678901234"
@@ -73,6 +79,22 @@ ecu:
       volatile: true
       write: {}
 
+  dtcs:
+    - code: 0x010100
+      status: 0x09
+      snapshots:
+        - record: 0x01
+          dids:
+            - {id: 0xF40C, hex: "0B B8"}
+      extended_data:
+        - record: 0x01
+          hex: "05"
+    - code: 0x030000
+      status: 0x04
+    - code: 0xC10000
+      status: 0x08
+      permanent: true
+
   routines:
     - id: 0xFF00
       access:
@@ -89,6 +111,7 @@ ecu:
       start:
         effects:
           - set_did: {id: 0x0101, ascii: "ACTIVE"}
+          - set_dtc: {code: 0x030000, status: 0x09}
       stop: {}
     - id: 0xFF01
       start:

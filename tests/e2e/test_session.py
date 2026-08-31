@@ -54,11 +54,11 @@ def test_functional_tester_present_suppressed(uds):
 
 
 def test_unsupported_service(uds):
-    assert uds([0x85, 0x01]) == nrc(0x85, 0x11)
+    assert uds([0xBA, 0x01]) == nrc(0xBA, 0x11)
 
 
 def test_unsupported_service_functional_is_silent(uds):
-    assert uds.functional([0x85, 0x01], timeout=0.3) is None
+    assert uds.functional([0xBA, 0x01], timeout=0.3) is None
 
 
 def test_udsoncan_negative_response(client):

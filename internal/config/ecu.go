@@ -8,6 +8,7 @@ type ECU struct {
 	DIDs        []DID     `yaml:"dids"`
 	Memory      *Memory   `yaml:"memory"`
 	Routines    []Routine `yaml:"routines"`
+	DTCs        []DTC     `yaml:"dtcs"`
 }
 
 // Access describes the conditions under which an element (service, session,
@@ -36,6 +37,15 @@ type Services struct {
 	ReadMemoryByAddress      *ReadMemoryService     `yaml:"read_memory_by_address"`
 	WriteMemoryByAddress     *Service               `yaml:"write_memory_by_address"`
 	RoutineControl           *Service               `yaml:"routine_control"`
+	ReadDTCInformation       *ReadDTCService        `yaml:"read_dtc_information"`
+	ClearDiagnosticInfo      *ClearDTCService       `yaml:"clear_diagnostic_information"`
+	ControlDTCSetting        *Service               `yaml:"control_dtc_setting"`
+}
+
+// SubFunction restricts access to one sub-function of a service.
+type SubFunction struct {
+	ID     uint8  `yaml:"id"`
+	Access Access `yaml:"access"`
 }
 
 // SessionControlService configures DiagnosticSessionControl (0x10).

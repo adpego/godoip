@@ -9,6 +9,7 @@ import (
 	"github.com/adpego/godoip/internal/memimage"
 	"github.com/adpego/godoip/internal/uds"
 	"github.com/adpego/godoip/internal/uds/services/did"
+	"github.com/adpego/godoip/internal/uds/services/dtc"
 	"github.com/adpego/godoip/internal/uds/services/memory"
 	"github.com/adpego/godoip/internal/uds/services/routine"
 	"github.com/adpego/godoip/internal/uds/udstest"
@@ -180,6 +181,8 @@ func TestInvalidConfig(t *testing.T) {
 		"erase no memory":  {{ID: 1, Start: &config.RoutineAction{Effects: []config.RoutineEffect{{EraseMemory: &config.MemoryRange{}}}}}},
 		"unknown DID":      {{ID: 1, Start: &config.RoutineAction{Effects: []config.RoutineEffect{{SetDID: &config.DIDValue{ID: 9}}}}}},
 		"empty effect":     {{ID: 1, Start: &config.RoutineAction{Effects: []config.RoutineEffect{{}}}}},
+		"two effects":      {{ID: 1, Start: &config.RoutineAction{Effects: []config.RoutineEffect{{SetDID: &config.DIDValue{ID: 9}, SetDTC: &config.DTCStatus{}}}}}},
+		"unknown DTC":      {{ID: 1, Start: &config.RoutineAction{Effects: []config.RoutineEffect{{SetDTC: &config.DTCStatus{Code: 9}}}}}},
 		"effect not start": {{ID: 1, Stop: &config.RoutineAction{Effects: []config.RoutineEffect{{SetDID: &config.DIDValue{ID: 9}}}}}},
 	}
 	for name, routines := range cases {
@@ -188,4 +191,25 @@ func TestInvalidConfig(t *testing.T) {
 			t.Errorf("%s: expected error", name)
 		}
 	}
+}
+
+func TestSetDTCEffect(t *testing.T) {
+	e, _ := udstest.New(t)
+	dtcs, err := dtc.NewStore(e, []config.DTC{{Code: 0x010000, Status: 0x00}})
+	udstest.Must(t, err)
+	r := config.Routine{ID: 0x0301, Start: &config.RoutineAction{Effects: []config.RoutineEffect{
+		{SetDTC: &config.DTCStatus{Code: 0x010000, Status: 0x09}},
+	}}}
+	udstest.Must(t, routine.Register(e, &config.Service{}, []config.Routine{r}, routine.Deps{DTCs: dtcs}))
+	udstest.Must(t, dtc.RegisterRead(e, &config.ReadDTCService{}, dtcs))
+	udstest.Must(t, dtc.RegisterSetting(e, &config.Service{}, dtcs))
+
+	// Ignored while DTC setting is off.
+	udstest.Send(t, e, []byte{0x85, 0x02}, []byte{0xC5, 0x02})
+	udstest.Send(t, e, []byte{0x31, 0x01, 0x03, 0x01}, []byte{0x71, 0x01, 0x03, 0x01})
+	udstest.Send(t, e, []byte{0x19, 0x02, 0xFF}, []byte{0x59, 0x02, 0xFF})
+
+	udstest.Send(t, e, []byte{0x85, 0x01}, []byte{0xC5, 0x01})
+	udstest.Send(t, e, []byte{0x31, 0x01, 0x03, 0x01}, []byte{0x71, 0x01, 0x03, 0x01})
+	udstest.Send(t, e, []byte{0x19, 0x02, 0xFF}, []byte{0x59, 0x02, 0xFF, 0x01, 0x00, 0x00, 0x09})
 }

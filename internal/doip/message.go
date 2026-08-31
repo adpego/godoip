@@ -23,15 +23,15 @@ type AnnouncePayload struct {
 
 // Routing activation response codes (ISO 13400-2).
 const (
-	ActivationDeniedUnknownSrc        uint8 = 0x00 // Unknown source address — close socket
-	ActivationDeniedNoFreeSockets     uint8 = 0x01 // All TCP sockets active — close socket
-	ActivationDeniedSAMismatch        uint8 = 0x02 // SA mismatch on active socket — close socket
-	ActivationDeniedSAAlreadyActive   uint8 = 0x03 // SA active on different socket — close socket
-	ActivationDeniedMissingAuth       uint8 = 0x04 // Authentication required — register, do not activate
-	ActivationDeniedConfirmRejected   uint8 = 0x05 // Confirmation rejected — close socket
-	ActivationDeniedUnsupportedType   uint8 = 0x06 // Unsupported activation type — close socket
-	ActivationSuccess                 uint8 = 0x10 // Successfully activated
-	ActivationSuccessConfirmRequired  uint8 = 0x11 // Activated, confirmation required
+	ActivationDeniedUnknownSrc       uint8 = 0x00 // Unknown source address — close socket
+	ActivationDeniedNoFreeSockets    uint8 = 0x01 // All TCP sockets active — close socket
+	ActivationDeniedSAMismatch       uint8 = 0x02 // SA mismatch on active socket — close socket
+	ActivationDeniedSAAlreadyActive  uint8 = 0x03 // SA active on different socket — close socket
+	ActivationDeniedMissingAuth      uint8 = 0x04 // Authentication required — register, do not activate
+	ActivationDeniedConfirmRejected  uint8 = 0x05 // Confirmation rejected — close socket
+	ActivationDeniedUnsupportedType  uint8 = 0x06 // Unsupported activation type — close socket
+	ActivationSuccess                uint8 = 0x10 // Successfully activated
+	ActivationSuccessConfirmRequired uint8 = 0x11 // Activated, confirmation required
 )
 
 // BuildRoutingActivationResponse builds a Routing Activation Response message.

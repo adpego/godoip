@@ -82,6 +82,25 @@ ecu:
 
     routine_control: {}
 
+    read_dtc_information:
+      status_availability_mask: 0xFF
+      # report_types:              # empty = every implemented report type
+      #   - id: 0x02
+      #   - id: 0x04
+      #     access:
+      #       sessions: [0x03]
+
+    clear_diagnostic_information:
+      status_after_clear: 0x50     # testNotCompleted bits set (ISO default)
+      groups:
+        - id: 0x000001
+          name: powertrain
+          codes: [0x010100, 0x030000]
+
+    control_dtc_setting:
+      access:
+        sessions: [0x03]
+
   # Data identifiers shared by ReadDataByIdentifier and WriteDataByIdentifier:
   # a successful write changes the value returned by later reads.
   #   ascii / hex      initial value
@@ -182,11 +201,35 @@ ecu:
       start:
         effects:
           - set_did: {id: 0x0101, ascii: "ACTIVE"}
+          - set_dtc: {code: 0x030000, status: 0x09}   # ignored while DTC setting is off
       stop:
         response: {hex: "00"}
       results:
         running_response: {hex: "01"}
         response: {hex: "00"}
+
+  # Diagnostic trouble codes, in chronological order (first = oldest).
+  dtcs:
+    - code: 0x010100               # P0101
+      name: Mass air flow circuit range
+      status: 0x2F
+      fault_detection_counter: 0x7F
+      snapshots:
+        - record: 0x01
+          dids:
+            - {id: 0xF40C, hex: "0B B8"}   # engine speed
+            - {id: 0xF40D, hex: "50"}      # vehicle speed
+      extended_data:
+        - record: 0x01
+          hex: "05"                       # occurrence counter
+    - code: 0x030000               # P0300
+      name: Random misfire detected
+      status: 0x00
+      fault_detection_counter: 0x20
+    - code: 0xC10000               # U0100
+      name: Lost communication with ECM
+      status: 0x08
+      permanent: true
 
   # ECU memory used by ReadMemoryByAddress / WriteMemoryByAddress.
   # The input file is never modified: writes go to output_file.
