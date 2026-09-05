@@ -61,6 +61,10 @@ ecu:
 
     control_dtc_setting: {}
 
+    input_output_control_by_identifier:
+      access:
+        sessions: [0x03]
+
   dids:
     - id: 0xF190
       ascii: "WBA12345678901234"
@@ -78,6 +82,10 @@ ecu:
       variable_length: true
       volatile: true
       write: {}
+    - id: 0x0500
+      hex: "1E"
+      io_control:
+        default: {hex: "00"}
 
   dtcs:
     - code: 0x010100

@@ -14,6 +14,7 @@ import (
 	"github.com/adpego/godoip/internal/uds/services/did"
 	"github.com/adpego/godoip/internal/uds/services/dtc"
 	"github.com/adpego/godoip/internal/uds/services/ecureset"
+	"github.com/adpego/godoip/internal/uds/services/iocontrol"
 	"github.com/adpego/godoip/internal/uds/services/memory"
 	"github.com/adpego/godoip/internal/uds/services/routine"
 	"github.com/adpego/godoip/internal/uds/services/security"
@@ -53,6 +54,7 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 		{"tester_present", func() error { return testerpresent.Register(e, svc.TesterPresent) }},
 		{"read_data_by_identifier", func() error { return did.RegisterRead(e, svc.ReadDataByIdentifier, dids) }},
 		{"write_data_by_identifier", func() error { return did.RegisterWrite(e, svc.WriteDataByIdentifier, dids) }},
+		{"input_output_control_by_identifier", func() error { return iocontrol.Register(e, svc.IOControl, cfg.DIDs, dids) }},
 		{"read_memory_by_address", func() error { return memory.RegisterRead(e, svc.ReadMemoryByAddress, mem) }},
 		{"write_memory_by_address", func() error { return memory.RegisterWrite(e, svc.WriteMemoryByAddress, mem) }},
 		{"read_dtc_information", func() error { return dtc.RegisterRead(e, svc.ReadDTCInformation, dtcs) }},

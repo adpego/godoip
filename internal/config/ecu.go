@@ -40,6 +40,7 @@ type Services struct {
 	ReadDTCInformation       *ReadDTCService        `yaml:"read_dtc_information"`
 	ClearDiagnosticInfo      *ClearDTCService       `yaml:"clear_diagnostic_information"`
 	ControlDTCSetting        *Service               `yaml:"control_dtc_setting"`
+	IOControl                *Service               `yaml:"input_output_control_by_identifier"`
 }
 
 // SubFunction restricts access to one sub-function of a service.
@@ -115,4 +116,13 @@ type DID struct {
 	Volatile       bool             `yaml:"volatile"`        // restore the initial value on ECU reset
 	Read           *Access          `yaml:"read"`            // nil = readable in any session without security
 	Write          *Access          `yaml:"write"`           // nil = not writable
+	IOControl      *IOControl       `yaml:"io_control"`      // nil = not controllable by 0x2F
+}
+
+// IOControl makes a DID controllable by InputOutputControlByIdentifier (0x2F).
+type IOControl struct {
+	Access     Access  `yaml:"access"`
+	Parameters []uint8 `yaml:"parameters"`  // supported inputOutputControlParameters; empty = 0x00-0x03
+	Default    *Data   `yaml:"default"`     // value for resetToDefault; defaults to the DID initial value
+	EnableMask bool    `yaml:"enable_mask"` // shortTermAdjustment carries a controlEnableMask of the DID size
 }

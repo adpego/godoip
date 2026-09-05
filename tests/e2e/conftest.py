@@ -133,6 +133,7 @@ def client(doip):
         0x0100: ">H",
         0x0101: udsoncan.AsciiCodec(6),
     }
+    config["input_output"] = {0x0500: "B"}
     config["request_timeout"] = 2
     with Client(DoIPClientUDSConnector(doip), config=config) as c:
         yield c

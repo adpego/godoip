@@ -101,6 +101,10 @@ ecu:
       access:
         sessions: [0x03]
 
+    input_output_control_by_identifier:
+      access:
+        sessions: [0x03]
+
   # Data identifiers shared by ReadDataByIdentifier and WriteDataByIdentifier:
   # a successful write changes the value returned by later reads.
   #   ascii / hex      initial value
@@ -109,6 +113,9 @@ ecu:
   #   volatile         restore the initial value on ECU reset
   #   read             access to read (omitted = always readable)
   #   write            access to write (omitted = not writable)
+  #   io_control       controllable with InputOutputControlByIdentifier (0x2F):
+  #                      parameters (default 0x00-0x03), default (resetToDefault value),
+  #                      enable_mask (shortTermAdjustment carries a mask), access
   dids:
     - id: 0xF190
       name: VIN
@@ -145,6 +152,21 @@ ecu:
       variable_length: true
       volatile: true
       write: {}
+
+    - id: 0x0500
+      name: Cooling fan duty cycle (%)
+      hex: "1E"
+      io_control:
+        default: {hex: "00"}
+
+    - id: 0x0501
+      name: Output lines bitfield
+      hex: "00 00"
+      io_control:
+        parameters: [0x00, 0x03]
+        enable_mask: true
+        access:
+          security_levels: [0x01]
 
     - id: 0x0200
       name: Secret data
