@@ -114,7 +114,9 @@ func TestBuildRoutingActivationResponse(t *testing.T) {
 // --- BuildAnnouncement ---
 
 func TestBuildAnnouncement(t *testing.T) {
+	sync := uint8(0x00)
 	p := AnnouncePayload{
+		SyncStatus:     &sync,
 		Version:        0x02,
 		VIN:            "WBA12345678901234",
 		LogicalAddress: 0x0E00,
@@ -232,5 +234,132 @@ func TestBuildDiagnosticMsg(t *testing.T) {
 	payload := msg[HeaderLength:]
 	if !bytes.Equal(payload[4:], udsData) {
 		t.Errorf("uds data: got % X, want % X", payload[4:], udsData)
+	}
+}
+
+func TestBuildAnnouncementWithoutSyncStatus(t *testing.T) {
+	msg := BuildAnnouncement(AnnouncePayload{Version: 0x02, FurtherAction: 0x10})
+	if len(msg) != HeaderLength+32 {
+		t.Fatalf("length: got %d, want %d", len(msg), HeaderLength+32)
+	}
+	if msg[HeaderLength+31] != 0x10 {
+		t.Errorf("further action: got 0x%02X", msg[HeaderLength+31])
+	}
+}
+
+// --- header validation ---
+
+var handled = map[uint16]bool{VehicleIdentRequest: true, VehicleIdentRequestEID: true, RoutingActivationReq: true, DiagnosticMessage: true}
+
+func TestHeaderValidate(t *testing.T) {
+	cases := []struct {
+		name   string
+		header []byte
+		code   uint8
+		ok     bool
+	}{
+		{"valid", BuildHeader(0x02, RoutingActivationReq, 7), 0, true},
+		{"valid with OEM data", BuildHeader(0x02, RoutingActivationReq, 11), 0, true},
+		{"bad inverse", []byte{0x02, 0x00, 0x00, 0x05, 0, 0, 0, 7}, NackIncorrectPattern, false},
+		{"bad version", BuildHeader(0x03, RoutingActivationReq, 7), NackIncorrectPattern, false},
+		{"default version ident", BuildHeader(0xFF, VehicleIdentRequest, 0), 0, true},
+		{"default version other", BuildHeader(0xFF, RoutingActivationReq, 7), NackIncorrectPattern, false},
+		{"unknown type", BuildHeader(0x02, 0x1234, 0), NackUnknownPayloadType, false},
+		{"not handled", BuildHeader(0x02, AliveCheckReq, 0), NackUnknownPayloadType, false},
+		{"too large", BuildHeader(0x02, DiagnosticMessage, 5000), NackMessageTooLarge, false},
+		{"bad length", BuildHeader(0x02, RoutingActivationReq, 8), NackInvalidPayloadLength, false},
+		{"bad EID length", BuildHeader(0x02, VehicleIdentRequestEID, 5), NackInvalidPayloadLength, false},
+		{"short diag", BuildHeader(0x02, DiagnosticMessage, 4), NackInvalidPayloadLength, false},
+	}
+	for _, c := range cases {
+		h, err := ParseHeader(c.header)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		code, ok := h.Validate(0x02, handled, 4096)
+		if ok != c.ok || (!ok && code != c.code) {
+			t.Errorf("%s: got (0x%02X, %v), want (0x%02X, %v)", c.name, code, ok, c.code, c.ok)
+		}
+	}
+}
+
+func TestParseHeaderTooShort(t *testing.T) {
+	if _, err := ParseHeader([]byte{0x02}); err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestBuildGenericNack(t *testing.T) {
+	want := []byte{0x02, 0xFD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, NackUnknownPayloadType}
+	if got := BuildGenericNack(0x02, NackUnknownPayloadType); !bytes.Equal(got, want) {
+		t.Errorf("got % X, want % X", got, want)
+	}
+}
+
+// --- vehicle identification ---
+
+func TestVehicleIdentMatches(t *testing.T) {
+	p := AnnouncePayload{VIN: "WBA12345678901234", EID: [6]byte{1, 2, 3, 4, 5, 6}}
+	cases := []struct {
+		name    string
+		typ     uint16
+		payload []byte
+		want    bool
+	}{
+		{"generic", VehicleIdentRequest, nil, true},
+		{"eid match", VehicleIdentRequestEID, []byte{1, 2, 3, 4, 5, 6}, true},
+		{"eid mismatch", VehicleIdentRequestEID, []byte{1, 2, 3, 4, 5, 7}, false},
+		{"vin match", VehicleIdentRequestVIN, []byte("WBA12345678901234"), true},
+		{"vin mismatch", VehicleIdentRequestVIN, []byte("WBA12345678901235"), false},
+	}
+	for _, c := range cases {
+		got, err := VehicleIdentMatches(c.typ, c.payload, p)
+		if err != nil || got != c.want {
+			t.Errorf("%s: got %v, %v", c.name, got, err)
+		}
+	}
+	if _, err := VehicleIdentMatches(VehicleIdentRequestEID, []byte{1}, p); err == nil {
+		t.Error("short EID: expected error")
+	}
+	if _, err := VehicleIdentMatches(RoutingActivationReq, nil, p); err == nil {
+		t.Error("wrong type: expected error")
+	}
+}
+
+// --- routing activation with OEM data ---
+
+func TestParseRoutingActivationRequestOEM(t *testing.T) {
+	req, err := ParseRoutingActivationRequest([]byte{0x0E, 0x00, 0x00, 0, 0, 0, 0, 0xDE, 0xAD, 0xBE, 0xEF})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(req.OEMSpecific, []byte{0xDE, 0xAD, 0xBE, 0xEF}) {
+		t.Errorf("OEM data: got % X", req.OEMSpecific)
+	}
+}
+
+// --- status messages ---
+
+func TestBuildEntityStatusResponse(t *testing.T) {
+	got := BuildEntityStatusResponse(0x02, EntityStatus{NodeType: NodeTypeNode, MaxSockets: 15, OpenSockets: 2, MaxDataSize: 4096})
+	want := append(BuildHeader(0x02, EntityStatusResp, 7), 0x01, 0x0F, 0x02, 0x00, 0x00, 0x10, 0x00)
+	if !bytes.Equal(got, want) {
+		t.Errorf("got % X, want % X", got, want)
+	}
+	got = BuildEntityStatusResponse(0x02, EntityStatus{NodeType: NodeTypeGateway, MaxSockets: 1})
+	if len(got) != HeaderLength+3 {
+		t.Errorf("without max data size: got % X", got)
+	}
+}
+
+func TestBuildPowerModeAndAliveCheck(t *testing.T) {
+	if got := BuildPowerModeResponse(0x02, PowerModeReady); !bytes.Equal(got, append(BuildHeader(0x02, DiagnosticPowerModeResp, 1), 0x01)) {
+		t.Errorf("power mode: got % X", got)
+	}
+	if got := BuildAliveCheckResponse(0x02, 0x0E80); !bytes.Equal(got, append(BuildHeader(0x02, AliveCheckResp, 2), 0x0E, 0x80)) {
+		t.Errorf("alive check response: got % X", got)
+	}
+	if got := BuildAliveCheckRequest(0x02); !bytes.Equal(got, BuildHeader(0x02, AliveCheckReq, 0)) {
+		t.Errorf("alive check request: got % X", got)
 	}
 }

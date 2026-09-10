@@ -70,15 +70,20 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 
 ### DoIP (ISO 13400-2)
 
-| Feature                                   | Implemented | Unit | E2E |
-|-------------------------------------------|:-----------:|:----:|:---:|
-| Vehicle announcement (UDP broadcast)      | ✅ | ✅ |    |
-| Vehicle identification request / response | ❌ |    |    |
-| Routing activation (TCP)                  | ✅ | ✅ | ✅ |
-| Diagnostic message + positive/negative ACK | ✅ | ✅ | ✅ |
-| Alive check                               | ❌ |    |    |
-| Entity status / power mode requests       | ❌ |    |    |
-| Generic header NACK                       | ❌ |    |    |
+| Feature                                                      | Implemented | Unit | E2E | Notes |
+|--------------------------------------------------------------|:-----------:|:----:|:---:|-------|
+| Vehicle announcement on start-up (UDP)                       | ✅ | ✅ | ✅ | Enable/disable, count, interval, initial delay, destination |
+| Vehicle identification request (0x0001)                      | ✅ | ✅ | ✅ | Also accepts default protocol version 0xFF |
+| Vehicle identification request with EID / VIN (0x0002/0x0003) | ✅ | ✅ | ✅ | Answers only when EID/VIN match |
+| DoIP entity status (0x4001/0x4002)                           | ✅ | ✅ | ✅ | Node type, max/open sockets, max data size |
+| Diagnostic power mode (0x4003/0x4004)                        | ✅ | ✅ | ✅ | Configurable mode |
+| Routing activation (0x0005/0x0006)                           | ✅ | ✅ | ✅ | Client address range, activation types, SA checks, max sockets |
+| Alive check (0x0007/0x0008)                                  | ⚠️ | ✅ | ✅ | Answers client requests; the server never initiates alive checks |
+| Diagnostic message + positive/negative ACK (0x8001-0x8003)   | ✅ | ✅ | ✅ | Physical and functional addressing |
+| Generic header NACK (0x0000)                                 | ✅ | ✅ | ✅ | Pattern, unknown type, too large, invalid length (TCP and UDP) |
+| Initial / general inactivity timers                          | ✅ | ✅ |    | |
+| TLS (DoIP over port 3496)                                    | ❌ |    |    | |
+| IPv6 / multicast announcements                               | ❌ |    |    | |
 
 ## Configuration overview
 
@@ -86,6 +91,9 @@ See [`config.yaml`](config.yaml) for a complete, commented example.
 
 - `server`: DoIP settings. `logical_address` is both the DoIP entity and the
   ECU physical address; `functional_address` defaults to `0xE400`.
+  `server.announcement` controls the start-up vehicle announcements
+  (`enabled: false` to disable them); node type, power mode, socket limits,
+  activation types and inactivity timers are configurable too.
 - `ecu.services`: a service missing from this map is not supported (NRC 0x11);
   use `{}` to enable it with defaults. Every service accepts an `access` block.
 - `access` (services, sessions, reset types, security levels, DIDs, memory

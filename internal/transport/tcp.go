@@ -1,39 +1,60 @@
 package transport
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"slices"
 	"sync"
+	"time"
 
 	"github.com/adpego/godoip/internal/doip"
 	"github.com/adpego/godoip/internal/uds"
 )
 
-const maxSessions = 15 // ISO 13400 allows up to 15 concurrent TCP connections
+// tcpHandled lists the payload types accepted on TCP.
+var tcpHandled = map[uint16]bool{
+	doip.RoutingActivationReq: true,
+	doip.AliveCheckReq:        true,
+	doip.AliveCheckResp:       true,
+	doip.DiagnosticMessage:    true,
+}
 
-// TCPConfig holds the DoIP settings of the TCP server.
+// TCPConfig holds the TCP-specific DoIP settings.
 type TCPConfig struct {
 	Port              int
-	DoIPVersion       uint8
-	LogicalAddress    uint16 // DoIP entity and ECU physical address
 	FunctionalAddress uint16 // UDS functional address
 	ClientAddrMin     uint16
 	ClientAddrMax     uint16
+	ActivationTypes   []uint8       // supported routing activation types
+	InitialInactivity time.Duration // max time before routing activation
+	GeneralInactivity time.Duration // max idle time of an activated socket
 }
 
 type TCPServer struct {
-	cfg TCPConfig
-	ecu *uds.ECU
+	cfg    TCPConfig
+	entity *Entity
+	ecu    *uds.ECU
 
 	mu             sync.Mutex
 	activeSessions map[uint16]net.Conn // sourceAddr -> conn
 }
 
-func NewTCPServer(cfg TCPConfig, ecu *uds.ECU) *TCPServer {
+func NewTCPServer(cfg TCPConfig, entity *Entity, ecu *uds.ECU) *TCPServer {
+	if cfg.ActivationTypes == nil {
+		cfg.ActivationTypes = []uint8{0x00, 0x01}
+	}
+	if cfg.InitialInactivity <= 0 {
+		cfg.InitialInactivity = 2 * time.Second
+	}
+	if cfg.GeneralInactivity <= 0 {
+		cfg.GeneralInactivity = 5 * time.Minute
+	}
 	return &TCPServer{
 		cfg:            cfg,
+		entity:         entity,
 		ecu:            ecu,
 		activeSessions: make(map[uint16]net.Conn),
 	}
@@ -46,12 +67,18 @@ func (s *TCPServer) Listen() error {
 		return fmt.Errorf("tcp listen on %s: %w", addr, err)
 	}
 	defer ln.Close()
-
 	log.Printf("TCP server listening on %s", addr)
+	return s.Serve(ln)
+}
 
+// Serve accepts connections on ln until it is closed.
+func (s *TCPServer) Serve(ln net.Listener) error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return err
+			}
 			log.Printf("TCP accept error: %v", err)
 			continue
 		}
@@ -59,29 +86,57 @@ func (s *TCPServer) Listen() error {
 	}
 }
 
+// connState is the state of one TCP connection.
+type connState struct {
+	conn      net.Conn
+	addr      uint16 // registered source address
+	activated bool
+}
+
+func (s *TCPServer) version() uint8 { return s.entity.cfg.DoIPVersion }
+
 func (s *TCPServer) handleConn(conn net.Conn) {
+	s.entity.openSockets.Add(1)
+	defer s.entity.openSockets.Add(-1)
 	defer conn.Close()
 	log.Printf("TCP connection from %s", conn.RemoteAddr())
 
-	var registeredAddr uint16
-	var activated bool
-
+	c := &connState{conn: conn}
 	defer func() {
-		if activated {
+		if c.activated {
 			s.mu.Lock()
-			delete(s.activeSessions, registeredAddr)
+			delete(s.activeSessions, c.addr)
 			s.mu.Unlock()
-			log.Printf("Session 0x%04X unregistered", registeredAddr)
+			log.Printf("Session 0x%04X unregistered", c.addr)
 		}
 	}()
 
 	for {
+		timeout := s.cfg.InitialInactivity
+		if c.activated {
+			timeout = s.cfg.GeneralInactivity
+		}
+		conn.SetReadDeadline(time.Now().Add(timeout))
+
 		hdr, err := doip.ReadHeader(conn)
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				log.Printf("TCP header read error: %v", err)
 			}
 			return
+		}
+
+		if code, ok := hdr.Validate(s.version(), tcpHandled, s.entity.cfg.MaxDataSize); !ok {
+			log.Printf("TCP generic NACK 0x%02X for header %+v", code, hdr)
+			conn.Write(doip.BuildGenericNack(s.version(), code))
+			if code == doip.NackIncorrectPattern || code == doip.NackInvalidPayloadLength {
+				return
+			}
+			// Discard the payload and wait for the next message.
+			if _, err := io.CopyN(io.Discard, conn, int64(hdr.PayloadLen)); err != nil {
+				return
+			}
+			continue
 		}
 
 		payload := make([]byte, hdr.PayloadLen)
@@ -90,122 +145,123 @@ func (s *TCPServer) handleConn(conn net.Conn) {
 			return
 		}
 
-		switch hdr.PayloadType {
-		case doip.RoutingActivationReq:
-			addr, ok := s.handleRoutingActivation(conn, payload, registeredAddr, activated)
-			if !ok {
-				return
-			}
-			registeredAddr = addr
-			activated = true
-
-		case doip.DiagnosticMessage:
-			if !activated {
-				log.Printf("Diagnostic message received before routing activation from %s", conn.RemoteAddr())
-				return
-			}
-			s.handleDiagnosticMessage(conn, payload, registeredAddr)
-
-		default:
-			log.Printf("TCP unhandled payload type: 0x%04X", hdr.PayloadType)
+		if !s.handleMessage(c, hdr.PayloadType, payload) {
+			return
 		}
 	}
 }
 
-func (s *TCPServer) handleDiagnosticMessage(conn net.Conn, payload []byte, registeredAddr uint16) {
+// handleMessage processes a validated message and reports whether the
+// connection must be kept open.
+func (s *TCPServer) handleMessage(c *connState, payloadType uint16, payload []byte) bool {
+	switch payloadType {
+	case doip.RoutingActivationReq:
+		return s.handleRoutingActivation(c, payload)
+
+	case doip.AliveCheckReq:
+		_, err := c.conn.Write(doip.BuildAliveCheckResponse(s.version(), s.entity.cfg.LogicalAddress))
+		return err == nil
+
+	case doip.AliveCheckResp:
+		return true // only meaningful as an answer to our own alive checks
+
+	case doip.DiagnosticMessage:
+		return s.handleDiagnosticMessage(c, payload)
+	}
+	return true
+}
+
+func (s *TCPServer) handleDiagnosticMessage(c *connState, payload []byte) bool {
 	msg, err := doip.ParseDiagnosticMessage(payload)
 	if err != nil {
 		log.Printf("diagnostic message parse error: %v", err)
-		return
+		return false
 	}
-
 	log.Printf("Diagnostic message: src=0x%04X target=0x%04X uds=% X", msg.SourceAddress, msg.TargetAddress, msg.UserData)
 
-	// Source address must match the registered address for this session
-	if msg.SourceAddress != registeredAddr {
-		nack := doip.BuildDiagnosticNack(s.cfg.DoIPVersion, msg.TargetAddress, msg.SourceAddress, doip.DiagNackInvalidSourceAddress)
-		conn.Write(nack)
-		return
+	nack := func(code uint8) {
+		c.conn.Write(doip.BuildDiagnosticNack(s.version(), msg.TargetAddress, msg.SourceAddress, code))
 	}
 
-	// Target must be the ECU itself or the functional address
+	// Source address must be activated on this socket; otherwise close it.
+	if !c.activated || msg.SourceAddress != c.addr {
+		nack(doip.DiagNackInvalidSourceAddress)
+		return false
+	}
+
+	// Target must be the ECU itself or the functional address.
 	functional := msg.TargetAddress == s.cfg.FunctionalAddress
-	if msg.TargetAddress != s.cfg.LogicalAddress && !functional {
-		nack := doip.BuildDiagnosticNack(s.cfg.DoIPVersion, msg.TargetAddress, msg.SourceAddress, doip.DiagNackUnknownTargetAddress)
-		conn.Write(nack)
-		return
+	if msg.TargetAddress != s.entity.cfg.LogicalAddress && !functional {
+		nack(doip.DiagNackUnknownTargetAddress)
+		return true
 	}
 
-	// Acknowledge receipt
-	ack := doip.BuildDiagnosticAck(s.cfg.DoIPVersion, msg.TargetAddress, msg.SourceAddress)
-	if _, err := conn.Write(ack); err != nil {
+	ack := doip.BuildDiagnosticAck(s.version(), msg.TargetAddress, msg.SourceAddress)
+	if _, err := c.conn.Write(ack); err != nil {
 		log.Printf("diagnostic ack write error: %v", err)
-		return
+		return false
 	}
 
-	// Process UDS and send response (if any). Responses always come from the
-	// ECU physical address, even for functional requests.
+	// Responses always come from the ECU physical address, even for
+	// functional requests.
 	udsResp := s.ecu.Handle(msg.UserData, functional)
 	if udsResp == nil {
-		return
+		return true
 	}
-	resp := doip.BuildDiagnosticMsg(s.cfg.DoIPVersion, s.cfg.LogicalAddress, msg.SourceAddress, udsResp)
-	if _, err := conn.Write(resp); err != nil {
+	resp := doip.BuildDiagnosticMsg(s.version(), s.entity.cfg.LogicalAddress, msg.SourceAddress, udsResp)
+	if _, err := c.conn.Write(resp); err != nil {
 		log.Printf("diagnostic response write error: %v", err)
+		return false
 	}
+	return true
 }
 
-// handleRoutingActivation processes the request and returns (sourceAddr, keep connection).
-func (s *TCPServer) handleRoutingActivation(conn net.Conn, payload []byte, currentAddr uint16, alreadyActivated bool) (uint16, bool) {
+func (s *TCPServer) handleRoutingActivation(c *connState, payload []byte) bool {
 	req, err := doip.ParseRoutingActivationRequest(payload)
 	if err != nil {
 		log.Printf("routing activation parse error: %v", err)
-		return 0, false
+		return false
 	}
-
 	log.Printf("Routing activation request from 0x%04X, type 0x%02X", req.SourceAddress, req.ActivationType)
 
-	code := s.validateActivation(conn, req, currentAddr, alreadyActivated)
-	resp := doip.BuildRoutingActivationResponse(s.cfg.DoIPVersion, req.SourceAddress, s.cfg.LogicalAddress, code)
-
-	if _, err := conn.Write(resp); err != nil {
+	code := s.activate(c, req)
+	resp := doip.BuildRoutingActivationResponse(s.version(), req.SourceAddress, s.entity.cfg.LogicalAddress, code)
+	if _, err := c.conn.Write(resp); err != nil {
 		log.Printf("routing activation response write error: %v", err)
-		return 0, false
+		return false
 	}
-
 	if code != doip.ActivationSuccess {
 		log.Printf("Routing activation denied (0x%02X) for 0x%04X", code, req.SourceAddress)
-		return 0, false
+		return false
 	}
-
-	s.mu.Lock()
-	s.activeSessions[req.SourceAddress] = conn
-	s.mu.Unlock()
-
 	log.Printf("Routing activation successful for 0x%04X", req.SourceAddress)
-	return req.SourceAddress, true
+	return true
 }
 
-func (s *TCPServer) validateActivation(conn net.Conn, req doip.RoutingActivationRequest, currentAddr uint16, alreadyActivated bool) uint8 {
-	if req.ActivationType > 0x01 {
+// activate validates a routing activation and registers the source address.
+func (s *TCPServer) activate(c *connState, req doip.RoutingActivationRequest) uint8 {
+	if !slices.Contains(s.cfg.ActivationTypes, req.ActivationType) {
 		return doip.ActivationDeniedUnsupportedType
 	}
 	if req.SourceAddress < s.cfg.ClientAddrMin || req.SourceAddress > s.cfg.ClientAddrMax {
 		return doip.ActivationDeniedUnknownSrc
 	}
-	if alreadyActivated && currentAddr != req.SourceAddress {
-		return doip.ActivationDeniedSAMismatch
+	if c.activated {
+		if c.addr != req.SourceAddress {
+			return doip.ActivationDeniedSAMismatch
+		}
+		return doip.ActivationSuccess // already active on this socket
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if existing, ok := s.activeSessions[req.SourceAddress]; ok && existing != conn {
+	if _, ok := s.activeSessions[req.SourceAddress]; ok {
 		return doip.ActivationDeniedSAAlreadyActive
 	}
-	if len(s.activeSessions) >= maxSessions {
+	if len(s.activeSessions) >= s.entity.cfg.MaxSockets {
 		return doip.ActivationDeniedNoFreeSockets
 	}
-
+	s.activeSessions[req.SourceAddress] = c.conn
+	c.addr, c.activated = req.SourceAddress, true
 	return doip.ActivationSuccess
 }

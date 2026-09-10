@@ -24,6 +24,7 @@ E2E_DIR = Path(__file__).resolve().parent
 SERVER_FILES = ["config.yaml", "firmware.s19"]
 
 TCP_PORT = 13410
+UDP_PORT = 13410
 ECU_ADDRESS = 0x0E80
 CLIENT_ADDRESS = 0x0E00
 FUNCTIONAL_ADDRESS = 0xE400
@@ -50,28 +51,62 @@ def _wait_for_port(host, port, proc, timeout=10.0):
     raise TimeoutError(f"server did not open {host}:{port}")
 
 
+class ServerProcess:
+    """Runs the server binary in a working directory with a copy of the e2e
+    configuration, optionally edited with text replacements."""
+
+    def __init__(self, binary, workdir, replacements=None, tcp_port=TCP_PORT):
+        for name in SERVER_FILES:
+            shutil.copy(E2E_DIR / name, workdir / name)
+        config = workdir / "config.yaml"
+        text = config.read_text()
+        for old, new in (replacements or {}).items():
+            assert old in text, f"{old!r} not found in config.yaml"
+            text = text.replace(old, new)
+        config.write_text(text)
+
+        self.log = open(workdir / "server.log", "w")
+        self.proc = subprocess.Popen(
+            [str(binary), "-config", str(config)],
+            cwd=workdir, stdout=self.log, stderr=subprocess.STDOUT,
+        )
+        self.tcp_port = tcp_port
+
+    def wait_ready(self):
+        _wait_for_port("127.0.0.1", self.tcp_port, self.proc)
+
+    def stop(self):
+        self.proc.terminate()
+        self.proc.wait(timeout=5)
+        self.log.close()
+
+
 @pytest.fixture
-def server(server_binary, tmp_path):
+def start_server(server_binary, tmp_path):
+    """Factory starting a server with a customized configuration."""
+    started = []
+
+    def start(replacements=None, tcp_port=TCP_PORT, wait=True):
+        srv = ServerProcess(server_binary, tmp_path, replacements, tcp_port)
+        started.append(srv)
+        if wait:
+            srv.wait_ready()
+        return srv
+
+    yield start
+    for srv in started:
+        srv.stop()
+
+
+@pytest.fixture
+def server(start_server):
     """A fresh server per test, so every test starts from the initial state."""
     host = os.environ.get("GODOIP_HOST")
     if host:
         yield host
         return
-
-    for name in SERVER_FILES:
-        shutil.copy(E2E_DIR / name, tmp_path / name)
-    log = open(tmp_path / "server.log", "w")
-    proc = subprocess.Popen(
-        [str(server_binary), "-config", str(tmp_path / "config.yaml")],
-        cwd=tmp_path, stdout=log, stderr=subprocess.STDOUT,
-    )
-    try:
-        _wait_for_port("127.0.0.1", TCP_PORT, proc)
-        yield "127.0.0.1"
-    finally:
-        proc.terminate()
-        proc.wait(timeout=5)
-        log.close()
+    start_server()
+    yield "127.0.0.1"
 
 
 @pytest.fixture
@@ -85,6 +120,7 @@ def doip(server):
     client = DoIPClient(
         server, ECU_ADDRESS,
         tcp_port=TCP_PORT,
+        udp_port=UDP_PORT,
         protocol_version=DOIP_VERSION,
         client_logical_address=CLIENT_ADDRESS,
     )

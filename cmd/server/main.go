@@ -2,8 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/doip"
@@ -11,7 +13,15 @@ import (
 	"github.com/adpego/godoip/internal/uds/services"
 )
 
-const defaultFunctionalAddress = 0xE400
+const (
+	defaultFunctionalAddress = 0xE400
+	defaultAnnounceAddress   = "255.255.255.255"
+	defaultAnnounceCount     = 3
+	defaultAnnounceInterval  = 500 * time.Millisecond
+
+	// vinDID is the standard VIN data identifier, used when no VIN is configured.
+	vinDID = 0xF190
+)
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to the configuration file")
@@ -27,19 +37,18 @@ func main() {
 		log.Fatalf("invalid ECU config: %v", err)
 	}
 
-	announce, err := buildAnnouncement(cfg)
+	entityCfg, err := buildEntityConfig(cfg)
 	if err != nil {
-		log.Fatalf("invalid announcement config: %v", err)
+		log.Fatalf("invalid DoIP entity config: %v", err)
 	}
+	entity := transport.NewEntity(entityCfg)
 
 	errCh := make(chan error, 2)
-
 	go func() {
-		errCh <- transport.NewUDPServer(cfg.Server.UDPPort, announce).Listen()
+		errCh <- transport.NewUDPServer(cfg.Server.UDPPort, entity, buildAnnouncementConfig(cfg)).Listen()
 	}()
-
 	go func() {
-		errCh <- transport.NewTCPServer(buildTCPConfig(cfg), ecu).Listen()
+		errCh <- transport.NewTCPServer(buildTCPConfig(cfg), entity, ecu).Listen()
 	}()
 
 	if err := <-errCh; err != nil {
@@ -47,28 +56,89 @@ func main() {
 	}
 }
 
-func parseHWAddr(s string) ([6]byte, error) {
-	var out [6]byte
-	hw, err := net.ParseMAC(s)
+func buildEntityConfig(cfg *config.Config) (transport.EntityConfig, error) {
+	s := cfg.Server
+	vin, err := announcedVIN(cfg)
 	if err != nil {
-		return out, err
+		return transport.EntityConfig{}, err
 	}
-	copy(out[:], hw)
-	return out, nil
+	eid, err := parseHWAddr(s.EID)
+	if err != nil {
+		return transport.EntityConfig{}, fmt.Errorf("eid: %w", err)
+	}
+	gid, err := parseHWAddr(s.GID)
+	if err != nil {
+		return transport.EntityConfig{}, fmt.Errorf("gid: %w", err)
+	}
+
+	nodeType := doip.NodeTypeNode
+	switch s.NodeType {
+	case "", "node":
+	case "gateway":
+		nodeType = doip.NodeTypeGateway
+	default:
+		return transport.EntityConfig{}, fmt.Errorf("node_type must be node or gateway, got %q", s.NodeType)
+	}
+
+	powerMode := doip.PowerModeReady
+	if s.PowerMode != nil {
+		powerMode = *s.PowerMode
+	}
+
+	return transport.EntityConfig{
+		DoIPVersion:    s.DoIPVersion,
+		LogicalAddress: uint16(s.LogicalAddress),
+		VIN:            vin,
+		EID:            eid,
+		GID:            gid,
+		FurtherAction:  s.FurtherAction,
+		SyncStatus:     s.VINGIDSyncStatus,
+		NodeType:       nodeType,
+		MaxSockets:     s.MaxTCPSockets,
+		MaxDataSize:    s.MaxDataSize,
+		PowerMode:      powerMode,
+	}, nil
+}
+
+func buildAnnouncementConfig(cfg *config.Config) transport.AnnouncementConfig {
+	a := cfg.Server.Announcement
+	out := transport.AnnouncementConfig{
+		Enabled:      a.Enabled == nil || *a.Enabled,
+		Count:        defaultAnnounceCount,
+		Interval:     defaultAnnounceInterval,
+		InitialDelay: time.Duration(a.InitialDelayMs) * time.Millisecond,
+	}
+	if a.Count > 0 {
+		out.Count = a.Count
+	}
+	if a.IntervalMs > 0 {
+		out.Interval = time.Duration(a.IntervalMs) * time.Millisecond
+	}
+	host, port := a.Address, a.Port
+	if host == "" {
+		host = defaultAnnounceAddress
+	}
+	if port == 0 {
+		port = cfg.Server.UDPPort
+	}
+	out.Address = net.JoinHostPort(host, fmt.Sprint(port))
+	return out
 }
 
 func buildTCPConfig(cfg *config.Config) transport.TCPConfig {
-	functional := cfg.Server.FunctionalAddress
+	s := cfg.Server
+	functional := s.FunctionalAddress
 	if functional == 0 {
 		functional = defaultFunctionalAddress
 	}
 	return transport.TCPConfig{
-		Port:              cfg.Server.TCPPort,
-		DoIPVersion:       cfg.Server.DoIPVersion,
-		LogicalAddress:    uint16(cfg.Server.LogicalAddress),
+		Port:              s.TCPPort,
 		FunctionalAddress: uint16(functional),
-		ClientAddrMin:     uint16(cfg.Server.ClientLogicalAddressMin),
-		ClientAddrMax:     uint16(cfg.Server.ClientLogicalAddressMax),
+		ClientAddrMin:     uint16(s.ClientLogicalAddressMin),
+		ClientAddrMax:     uint16(s.ClientLogicalAddressMax),
+		ActivationTypes:   s.ActivationTypes,
+		InitialInactivity: time.Duration(s.InitialInactivity) * time.Millisecond,
+		GeneralInactivity: time.Duration(s.GeneralInactivity) * time.Millisecond,
 	}
 }
 
@@ -86,30 +156,15 @@ func announcedVIN(cfg *config.Config) (string, error) {
 	return "", nil
 }
 
-// vinDID is the standard VIN data identifier, used when no VIN is configured.
-const vinDID = 0xF190
-
-func buildAnnouncement(cfg *config.Config) (doip.AnnouncePayload, error) {
-	vin, err := announcedVIN(cfg)
+func parseHWAddr(s string) ([6]byte, error) {
+	var out [6]byte
+	hw, err := net.ParseMAC(s)
 	if err != nil {
-		return doip.AnnouncePayload{}, err
+		return out, err
 	}
-
-	eid, err := parseHWAddr(cfg.Server.EID)
-	if err != nil {
-		return doip.AnnouncePayload{}, err
+	if len(hw) != 6 {
+		return out, fmt.Errorf("%q is not a 6-byte address", s)
 	}
-
-	gid, err := parseHWAddr(cfg.Server.GID)
-	if err != nil {
-		return doip.AnnouncePayload{}, err
-	}
-
-	return doip.AnnouncePayload{
-		Version:        cfg.Server.DoIPVersion,
-		VIN:            vin,
-		LogicalAddress: uint16(cfg.Server.LogicalAddress),
-		EID:            eid,
-		GID:            gid,
-	}, nil
+	copy(out[:], hw)
+	return out, nil
 }

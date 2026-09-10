@@ -9,6 +9,9 @@ server:
   gid: "00:1A:2B:3C:4D:5F"
   client_logical_address_min: 0x0E00
   client_logical_address_max: 0x0E0F
+  power_mode: 0x01
+  announcement:
+    enabled: false
 
 ecu:
   name: "E2E ECU"

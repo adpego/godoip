@@ -10,6 +10,24 @@ server:
   client_logical_address_min: 0x07E0
   client_logical_address_max: 0x07EF
 
+  node_type: node               # node | gateway (entity status)
+  max_tcp_sockets: 15           # concurrent routing activations
+  max_data_size: 4096           # largest DoIP payload accepted (generic NACK 0x02 above)
+  power_mode: 0x01              # diagnostic power mode: 0x00 not ready, 0x01 ready, 0x02 not supported
+  further_action: 0x00          # announcement: 0x00 none, 0x10 central security
+  # vin_gid_sync_status: 0x00   # optional announcement byte
+  activation_types: [0x00, 0x01]
+  initial_inactivity_ms: 2000   # close sockets without routing activation
+  general_inactivity_ms: 300000 # close idle sockets
+
+  announcement:
+    enabled: true               # send vehicle announcements on start-up
+    count: 3
+    interval_ms: 500
+    initial_delay_ms: 0
+    address: 255.255.255.255
+    # port: 13400               # defaults to udp_port
+
 # Every element (service, session, DID...) can have an `access` block:
 #   access:
 #     sessions: [0x03]          # allowed active sessions (empty = any)
