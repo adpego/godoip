@@ -11,10 +11,12 @@ import (
 
 	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/uds"
+	"github.com/adpego/godoip/internal/uds/services/commcontrol"
 	"github.com/adpego/godoip/internal/uds/services/did"
 	"github.com/adpego/godoip/internal/uds/services/dtc"
 	"github.com/adpego/godoip/internal/uds/services/ecureset"
 	"github.com/adpego/godoip/internal/uds/services/iocontrol"
+	"github.com/adpego/godoip/internal/uds/services/linkcontrol"
 	"github.com/adpego/godoip/internal/uds/services/memory"
 	"github.com/adpego/godoip/internal/uds/services/routine"
 	"github.com/adpego/godoip/internal/uds/services/security"
@@ -60,6 +62,14 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 		{"read_dtc_information", func() error { return dtc.RegisterRead(e, svc.ReadDTCInformation, dtcs) }},
 		{"clear_diagnostic_information", func() error { return dtc.RegisterClear(e, svc.ClearDiagnosticInfo, dtcs) }},
 		{"control_dtc_setting", func() error { return dtc.RegisterSetting(e, svc.ControlDTCSetting, dtcs) }},
+		{"communication_control", func() error {
+			_, err := commcontrol.Register(e, svc.CommunicationControl)
+			return err
+		}},
+		{"link_control", func() error {
+			_, err := linkcontrol.Register(e, svc.LinkControl)
+			return err
+		}},
 		{"routine_control", func() error {
 			return routine.Register(e, svc.RoutineControl, cfg.Routines, routine.Deps{DIDs: dids, DTCs: dtcs, Memory: mem})
 		}},

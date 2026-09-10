@@ -20,6 +20,7 @@ const (
 	SIDWriteMemoryByAddress           byte = 0x3D
 	SIDTesterPresent                  byte = 0x3E
 	SIDControlDTCSetting              byte = 0x85
+	SIDLinkControl                    byte = 0x87
 
 	NegativeResponseSID byte = 0x7F
 	PositiveResponseBit byte = 0x40

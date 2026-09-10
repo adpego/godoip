@@ -41,6 +41,23 @@ type Services struct {
 	ClearDiagnosticInfo      *ClearDTCService       `yaml:"clear_diagnostic_information"`
 	ControlDTCSetting        *Service               `yaml:"control_dtc_setting"`
 	IOControl                *Service               `yaml:"input_output_control_by_identifier"`
+	CommunicationControl     *CommControlService    `yaml:"communication_control"`
+	LinkControl              *LinkControlService    `yaml:"link_control"`
+}
+
+// CommControlService configures CommunicationControl (0x28).
+type CommControlService struct {
+	Service            `yaml:",inline"`
+	ControlTypes       []SubFunction `yaml:"control_types"`       // empty = 0x00-0x03
+	CommunicationTypes []uint8       `yaml:"communication_types"` // accepted communicationType bytes; empty = any valid
+}
+
+// LinkControlService configures LinkControl (0x87).
+type LinkControlService struct {
+	Service      `yaml:",inline"`
+	SubFunctions []SubFunction `yaml:"sub_functions"` // empty = 0x01-0x03
+	Modes        []uint8       `yaml:"modes"`         // supported linkControlModeIdentifiers; empty = ISO CAN/PC baudrates
+	MaxBaudrate  uint32        `yaml:"max_baudrate"`  // max specific baudrate for 0x02; 0 = any
 }
 
 // SubFunction restricts access to one sub-function of a service.

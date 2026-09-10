@@ -36,7 +36,7 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | 0x23 | ReadMemoryByAddress              | ✅ | ✅ | ✅ | Backed by S-Record / Intel HEX / binary file, per-region access |
 | 0x24 | ReadScalingDataByIdentifier      | ❌ |    |    | |
 | 0x27 | SecurityAccess                   | ✅ | ✅ | ✅ | Fixed/random seeds, xor/add/not/fixed/seed algorithms, lockout |
-| 0x28 | CommunicationControl             | ❌ |    |    | |
+| 0x28 | CommunicationControl             | ✅ | ✅ | ✅ | Control types 0x00–0x05, communication type filter, reset on default session |
 | 0x29 | Authentication                   | ❌ |    |    | |
 | 0x2A | ReadDataByPeriodicIdentifier     | ❌ |    |    | |
 | 0x2C | DynamicallyDefineDataIdentifier  | ❌ |    |    | |
@@ -54,7 +54,7 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | 0x84 | SecuredDataTransmission          | ❌ |    |    | |
 | 0x85 | ControlDTCSetting                | ✅ | ✅ | ✅ | Blocks DTC status updates, re-enabled in default session |
 | 0x86 | ResponseOnEvent                  | ❌ |    |    | |
-| 0x87 | LinkControl                      | ❌ |    |    | |
+| 0x87 | LinkControl                      | ✅ | ✅ | ✅ | Fixed/specific baudrate verification and transition |
 
 ### Generic UDS behaviour
 
@@ -121,7 +121,8 @@ internal/memimage/          S-Record / Intel HEX / binary memory images
 internal/uds/               UDS core: ECU, dispatcher, session/security state, access checks
 internal/uds/udstest/       test helpers for services
 internal/uds/services/      one package per service + services.New wiring them all
-  session/ ecureset/ security/ testerpresent/ did/ dtc/ memory/ routine/ iocontrol/
+  session/ ecureset/ security/ testerpresent/ did/ dtc/ memory/ routine/
+  iocontrol/ commcontrol/ linkcontrol/
 tests/e2e/                  pytest suite using doipclient + udsoncan
 firmware/                   sample firmware for config.yaml
 ```

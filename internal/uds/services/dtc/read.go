@@ -1,7 +1,8 @@
 package dtc
 
 import (
-	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/uds"
@@ -37,7 +38,7 @@ type reader struct {
 	store        *Store
 	availability uint8
 	format       uint8
-	reports      map[uint8]config.Access
+	reports      uds.SubFunctions
 }
 
 // reportHandler builds the response data (after SID+0x40 and sub-function)
@@ -67,26 +68,20 @@ func RegisterRead(e *uds.ECU, cfg *config.ReadDTCService, store *Store) error {
 	if cfg == nil {
 		return nil
 	}
-	r := &reader{store: store, availability: 0xFF, format: dtcFormatISO14229, reports: map[uint8]config.Access{}}
+	r := &reader{store: store, availability: 0xFF, format: dtcFormatISO14229}
 	if cfg.StatusAvailabilityMask != nil {
 		r.availability = *cfg.StatusAvailabilityMask
 	}
 	if cfg.DTCFormat != nil {
 		r.format = *cfg.DTCFormat
 	}
-	if len(cfg.ReportTypes) == 0 {
-		for id := range reports {
-			r.reports[id] = config.Access{}
-		}
-	}
-	for _, rt := range cfg.ReportTypes {
-		if _, ok := reports[rt.ID]; !ok {
-			return fmt.Errorf("report type 0x%02X is not implemented", rt.ID)
-		}
-		if _, dup := r.reports[rt.ID]; dup {
-			return fmt.Errorf("duplicate report type 0x%02X", rt.ID)
-		}
-		r.reports[rt.ID] = rt.Access
+	var err error
+	r.reports, err = uds.NewSubFunctions(cfg.ReportTypes, slices.Collect(maps.Keys(reports)), func(id uint8) bool {
+		_, ok := reports[id]
+		return ok
+	})
+	if err != nil {
+		return err
 	}
 
 	return e.Register(uds.Service{
@@ -99,11 +94,7 @@ func RegisterRead(e *uds.ECU, cfg *config.ReadDTCService, store *Store) error {
 }
 
 func (r *reader) handle(c *uds.Context, req uds.Request) []byte {
-	access, ok := r.reports[req.SubFunction]
-	if !ok {
-		return uds.NegativeResponse(req.SID, uds.NRCSubFunctionNotSupported)
-	}
-	if nrc := c.CheckAccess(access, uds.NRCSubFunctionNotSupportedInActiveSession); nrc != 0 {
+	if nrc := r.reports.Check(c, req.SubFunction); nrc != 0 {
 		return uds.NegativeResponse(req.SID, nrc)
 	}
 	report := reports[req.SubFunction]

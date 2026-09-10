@@ -68,6 +68,10 @@ ecu:
       access:
         sessions: [0x03]
 
+    communication_control: {}
+
+    link_control: {}
+
   dids:
     - id: 0xF190
       ascii: "WBA12345678901234"

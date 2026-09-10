@@ -123,6 +123,20 @@ ecu:
       access:
         sessions: [0x03]
 
+    communication_control:
+      access:
+        sessions: [0x02, 0x03]
+      # control_types:            # empty = 0x00-0x03
+      #   - id: 0x03
+      #     access: {security_levels: [0x01]}
+      communication_types: [0x01, 0x02, 0x03]
+
+    link_control:
+      access:
+        sessions: [0x02, 0x03]
+      modes: [0x10, 0x11, 0x12, 0x13]   # CAN 125k/250k/500k/1M
+      max_baudrate: 1000000
+
   # Data identifiers shared by ReadDataByIdentifier and WriteDataByIdentifier:
   # a successful write changes the value returned by later reads.
   #   ascii / hex      initial value
