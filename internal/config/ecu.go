@@ -43,6 +43,17 @@ type Services struct {
 	IOControl                *Service               `yaml:"input_output_control_by_identifier"`
 	CommunicationControl     *CommControlService    `yaml:"communication_control"`
 	LinkControl              *LinkControlService    `yaml:"link_control"`
+	RequestDownload          *TransferService       `yaml:"request_download"`
+	RequestUpload            *TransferService       `yaml:"request_upload"`
+	TransferData             *Service               `yaml:"transfer_data"`
+	RequestTransferExit      *Service               `yaml:"request_transfer_exit"`
+}
+
+// TransferService configures RequestDownload (0x34) / RequestUpload (0x35).
+type TransferService struct {
+	Service        `yaml:",inline"`
+	MaxBlockLength uint32  `yaml:"max_block_length"` // maxNumberOfBlockLength (SID and counter included); defaults to 1026
+	DataFormats    []uint8 `yaml:"data_formats"`     // accepted dataFormatIdentifiers; defaults to 0x00 (plain data)
 }
 
 // CommControlService configures CommunicationControl (0x28).

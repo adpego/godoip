@@ -137,6 +137,20 @@ ecu:
       modes: [0x10, 0x11, 0x12, 0x13]   # CAN 125k/250k/500k/1M
       max_baudrate: 1000000
 
+    # Data transfer on ecu.memory. Region read/write access applies.
+    # Downloads are applied and persisted to memory.output_file on
+    # RequestTransferExit; aborted transfers leave the memory untouched.
+    request_download:
+      access:
+        sessions: [0x02]
+      max_block_length: 0x0402   # SID + counter + 1024 data bytes
+      data_formats: [0x00]       # 0x00 = no compression/encryption
+    request_upload:
+      access:
+        sessions: [0x02, 0x03]
+    transfer_data: {}
+    request_transfer_exit: {}
+
   # Data identifiers shared by ReadDataByIdentifier and WriteDataByIdentifier:
   # a successful write changes the value returned by later reads.
   #   ascii / hex      initial value

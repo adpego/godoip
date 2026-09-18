@@ -72,6 +72,13 @@ ecu:
 
     link_control: {}
 
+    request_download:
+      max_block_length: 34
+    request_upload:
+      max_block_length: 34
+    transfer_data: {}
+    request_transfer_exit: {}
+
   dids:
     - id: 0xF190
       ascii: "WBA12345678901234"

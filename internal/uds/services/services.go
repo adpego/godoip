@@ -22,6 +22,7 @@ import (
 	"github.com/adpego/godoip/internal/uds/services/security"
 	"github.com/adpego/godoip/internal/uds/services/session"
 	"github.com/adpego/godoip/internal/uds/services/testerpresent"
+	"github.com/adpego/godoip/internal/uds/services/transfer"
 )
 
 type step struct {
@@ -68,6 +69,15 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 		}},
 		{"link_control", func() error {
 			_, err := linkcontrol.Register(e, svc.LinkControl)
+			return err
+		}},
+		{"data transfer", func() error {
+			_, err := transfer.Register(e, transfer.Services{
+				Download: svc.RequestDownload,
+				Upload:   svc.RequestUpload,
+				Data:     svc.TransferData,
+				Exit:     svc.RequestTransferExit,
+			}, mem)
 			return err
 		}},
 		{"routine_control", func() error {

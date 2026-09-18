@@ -43,10 +43,10 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | 0x2E | WriteDataByIdentifier            | ✅ | ✅ | ✅ | Writes are visible to later reads; fixed/variable length, volatile DIDs |
 | 0x2F | InputOutputControlByIdentifier   | ✅ | ✅ | ✅ | Per-DID control, all 4 parameters, enable mask, auto return on default session |
 | 0x31 | RoutineControl                   | ✅ | ✅ | ✅ | Start/stop/results, timed routines, option-based cases, effects |
-| 0x34 | RequestDownload                  | ❌ |    |    | |
-| 0x35 | RequestUpload                    | ❌ |    |    | |
-| 0x36 | TransferData                     | ❌ |    |    | |
-| 0x37 | RequestTransferExit              | ❌ |    |    | |
+| 0x34 | RequestDownload                  | ✅ | ✅ | ✅ | Buffered, applied and persisted on RequestTransferExit |
+| 0x35 | RequestUpload                    | ✅ | ✅ | ✅ | Reads from the memory image |
+| 0x36 | TransferData                     | ✅ | ✅ | ✅ | Block sequence counter (wraps), repeated blocks, max block length |
+| 0x37 | RequestTransferExit              | ✅ | ✅ | ✅ | Rejects incomplete transfers |
 | 0x38 | RequestFileTransfer              | ❌ |    |    | |
 | 0x3D | WriteMemoryByAddress             | ✅ | ✅ | ✅ | Persisted to a separate output file, the input file is never modified |
 | 0x3E | TesterPresent                    | ✅ | ✅ | ✅ | |
@@ -122,7 +122,7 @@ internal/uds/               UDS core: ECU, dispatcher, session/security state, a
 internal/uds/udstest/       test helpers for services
 internal/uds/services/      one package per service + services.New wiring them all
   session/ ecureset/ security/ testerpresent/ did/ dtc/ memory/ routine/
-  iocontrol/ commcontrol/ linkcontrol/
+  iocontrol/ commcontrol/ linkcontrol/ transfer/
 tests/e2e/                  pytest suite using doipclient + udsoncan
 firmware/                   sample firmware for config.yaml
 ```
