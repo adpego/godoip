@@ -12,6 +12,7 @@ import (
 	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/uds"
 	"github.com/adpego/godoip/internal/uds/services/commcontrol"
+	"github.com/adpego/godoip/internal/uds/services/dddi"
 	"github.com/adpego/godoip/internal/uds/services/did"
 	"github.com/adpego/godoip/internal/uds/services/dtc"
 	"github.com/adpego/godoip/internal/uds/services/ecureset"
@@ -57,6 +58,8 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 		{"tester_present", func() error { return testerpresent.Register(e, svc.TesterPresent) }},
 		{"read_data_by_identifier", func() error { return did.RegisterRead(e, svc.ReadDataByIdentifier, dids) }},
 		{"write_data_by_identifier", func() error { return did.RegisterWrite(e, svc.WriteDataByIdentifier, dids) }},
+		{"read_scaling_data_by_identifier", func() error { return did.RegisterScaling(e, svc.ReadScalingData, dids) }},
+		{"dynamically_define_data_identifier", func() error { return dddi.Register(e, svc.DynamicallyDefineDID, dids, mem) }},
 		{"input_output_control_by_identifier", func() error { return iocontrol.Register(e, svc.IOControl, cfg.DIDs, dids) }},
 		{"read_memory_by_address", func() error { return memory.RegisterRead(e, svc.ReadMemoryByAddress, mem) }},
 		{"write_memory_by_address", func() error { return memory.RegisterWrite(e, svc.WriteMemoryByAddress, mem) }},

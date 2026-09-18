@@ -214,3 +214,31 @@ func TestInvalidConfig(t *testing.T) {
 		}
 	}
 }
+
+// --- ReadScalingDataByIdentifier (0x24) ---
+
+func TestReadScalingData(t *testing.T) {
+	e, _ := udstest.New(t)
+	store, err := did.NewStore(e, []config.DID{
+		{ID: 0x0100, Data: config.Data{Hex: "00 64"}, Scaling: &config.Data{Hex: "12 01 02"}},
+		{ID: 0x0101, Data: config.Data{Hex: "00"}, Scaling: &config.Data{Hex: "01"}, Read: extendedOnly},
+		{ID: 0x0102, Data: config.Data{Hex: "00"}},
+	})
+	udstest.Must(t, err)
+	udstest.Must(t, did.RegisterScaling(e, &config.Service{}, store))
+
+	udstest.Send(t, e, []byte{0x24, 0x01, 0x00}, []byte{0x64, 0x01, 0x00, 0x12, 0x01, 0x02})
+	udstest.Send(t, e, []byte{0x24, 0x01, 0x02}, udstest.NRC(0x24, uds.NRCRequestOutOfRange))
+	udstest.Send(t, e, []byte{0x24, 0x12, 0x34}, udstest.NRC(0x24, uds.NRCRequestOutOfRange))
+	udstest.Send(t, e, []byte{0x24, 0x01, 0x01}, udstest.NRC(0x24, uds.NRCRequestOutOfRange))
+	udstest.SetSession(e, uds.SessionExtended)
+	udstest.Send(t, e, []byte{0x24, 0x01, 0x01}, []byte{0x64, 0x01, 0x01, 0x01})
+	udstest.Send(t, e, []byte{0x24, 0x01, 0x00, 0x00}, udstest.NRC(0x24, uds.NRCInvalidMessageLengthOrFormat))
+}
+
+func TestInvalidScaling(t *testing.T) {
+	e, _ := udstest.New(t)
+	if _, err := did.NewStore(e, []config.DID{{ID: 1, Scaling: &config.Data{Hex: "X"}}}); err == nil {
+		t.Error("expected error")
+	}
+}

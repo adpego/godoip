@@ -34,12 +34,12 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | 0x19 | ReadDTCInformation               | ⚠️ | ✅ | ✅ | Report types 0x01–0x04, 0x06, 0x0A–0x0E, 0x14, 0x15 |
 | 0x22 | ReadDataByIdentifier             | ✅ | ✅ | ✅ | Multiple DIDs per request, per-DID access |
 | 0x23 | ReadMemoryByAddress              | ✅ | ✅ | ✅ | Backed by S-Record / Intel HEX / binary file, per-region access |
-| 0x24 | ReadScalingDataByIdentifier      | ❌ |    |    | |
+| 0x24 | ReadScalingDataByIdentifier      | ✅ | ✅ | ✅ | Per-DID scaling record, DID read access applies |
 | 0x27 | SecurityAccess                   | ✅ | ✅ | ✅ | Fixed/random seeds, xor/add/not/fixed/seed algorithms, lockout |
 | 0x28 | CommunicationControl             | ✅ | ✅ | ✅ | Control types 0x00–0x05, communication type filter, reset on default session |
 | 0x29 | Authentication                   | ❌ |    |    | |
 | 0x2A | ReadDataByPeriodicIdentifier     | ❌ |    |    | |
-| 0x2C | DynamicallyDefineDataIdentifier  | ❌ |    |    | |
+| 0x2C | DynamicallyDefineDataIdentifier  | ✅ | ✅ | ✅ | By identifier, by memory address, clear; computed at read time |
 | 0x2E | WriteDataByIdentifier            | ✅ | ✅ | ✅ | Writes are visible to later reads; fixed/variable length, volatile DIDs |
 | 0x2F | InputOutputControlByIdentifier   | ✅ | ✅ | ✅ | Per-DID control, all 4 parameters, enable mask, auto return on default session |
 | 0x31 | RoutineControl                   | ✅ | ✅ | ✅ | Start/stop/results, timed routines, option-based cases, effects |
@@ -104,7 +104,7 @@ See [`config.yaml`](config.yaml) for a complete, commented example.
     security_levels: [0x01]   # one of these levels must be unlocked
     nrc: 0x22                 # always answer with this NRC
   ```
-- `ecu.dids`: shared by 0x22 / 0x2E / 0x2F (and routine effects).
+- `ecu.dids`: shared by 0x22 / 0x24 / 0x2C / 0x2E / 0x2F (and routine effects).
 - `ecu.dtcs`: shared by 0x19 / 0x14 / 0x85 (and routine effects).
 - `ecu.routines`: RoutineControl definitions.
 - `ecu.memory`: firmware file used by 0x23 / 0x3D. Writes go to
@@ -122,7 +122,7 @@ internal/uds/               UDS core: ECU, dispatcher, session/security state, a
 internal/uds/udstest/       test helpers for services
 internal/uds/services/      one package per service + services.New wiring them all
   session/ ecureset/ security/ testerpresent/ did/ dtc/ memory/ routine/
-  iocontrol/ commcontrol/ linkcontrol/ transfer/
+  iocontrol/ commcontrol/ linkcontrol/ transfer/ dddi/
 tests/e2e/                  pytest suite using doipclient + udsoncan
 firmware/                   sample firmware for config.yaml
 ```

@@ -18,7 +18,17 @@ type DID struct {
 	Volatile       bool
 	Read           config.Access
 	Write          *config.Access // nil = not writable
+	Scaling        []byte         // ReadScalingDataByIdentifier record, nil = none
+
+	sources []Source // dynamic DIDs only
 }
+
+// Source produces part of the value of a dynamically defined DID. It returns
+// an NRC when the data cannot be read in the current conditions.
+type Source func(c *uds.Context) ([]byte, byte)
+
+// Dynamic reports whether the DID was defined by DynamicallyDefineDataIdentifier.
+func (d *DID) Dynamic() bool { return d.sources != nil }
 
 func newDID(c config.DID) (*DID, error) {
 	value, err := c.Bytes()
@@ -41,6 +51,11 @@ func newDID(c config.DID) (*DID, error) {
 	}
 	if c.Read != nil {
 		d.Read = *c.Read
+	}
+	if c.Scaling != nil {
+		if d.Scaling, err = c.Scaling.Bytes(); err != nil {
+			return nil, fmt.Errorf("DID 0x%04X scaling: %w", c.ID, err)
+		}
 	}
 	return d, nil
 }
@@ -79,6 +94,64 @@ func (s *Store) Get(id uint16) *DID {
 func (s *Store) Set(id uint16, value []byte) {
 	if d := s.dids[id]; d != nil {
 		d.Value = append([]byte(nil), value...)
+	}
+}
+
+// ReadValue returns the current value of a DID, computing dynamic DIDs from
+// their sources. It returns an NRC if a source cannot be read.
+func (s *Store) ReadValue(c *uds.Context, d *DID) ([]byte, byte) {
+	if !d.Dynamic() {
+		return d.Value, 0
+	}
+	var out []byte
+	for _, src := range d.sources {
+		v, nrc := src(c)
+		if nrc != 0 {
+			return nil, nrc
+		}
+		out = append(out, v...)
+	}
+	return out, 0
+}
+
+// Define creates a dynamic DID, or appends sources to an existing one. It
+// fails if id is a static DID.
+func (s *Store) Define(id uint16, read config.Access, sources ...Source) error {
+	d := s.dids[id]
+	switch {
+	case d == nil:
+		s.dids[id] = &DID{ID: id, Read: read, sources: append([]Source{}, sources...)}
+	case d.Dynamic():
+		d.sources = append(d.sources, sources...)
+	default:
+		return fmt.Errorf("DID 0x%04X is not dynamic", id)
+	}
+	return nil
+}
+
+// Sources returns the number of sources of a dynamic DID (0 if undefined).
+func (s *Store) Sources(id uint16) int {
+	if d := s.dids[id]; d != nil {
+		return len(d.sources)
+	}
+	return 0
+}
+
+// ClearDynamic removes a dynamic DID; it reports whether it existed.
+func (s *Store) ClearDynamic(id uint16) bool {
+	if d := s.dids[id]; d != nil && d.Dynamic() {
+		delete(s.dids, id)
+		return true
+	}
+	return false
+}
+
+// ClearAllDynamic removes every dynamic DID.
+func (s *Store) ClearAllDynamic() {
+	for id, d := range s.dids {
+		if d.Dynamic() {
+			delete(s.dids, id)
+		}
 	}
 }
 

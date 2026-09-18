@@ -43,8 +43,12 @@ func handleRead(c *uds.Context, req uds.Request, store *Store, maxDIDs int) []by
 		if d.Read.NRC != 0 {
 			return uds.NegativeResponse(req.SID, d.Read.NRC)
 		}
+		value, nrc := store.ReadValue(c, d)
+		if nrc != 0 {
+			return uds.NegativeResponse(req.SID, nrc)
+		}
 		resp = append(resp, ids[i], ids[i+1])
-		resp = append(resp, d.Value...)
+		resp = append(resp, value...)
 	}
 
 	if len(resp) == 1 {
@@ -85,4 +89,31 @@ func handleWrite(c *uds.Context, req uds.Request, store *Store) []byte {
 	store.Set(d.ID, value)
 
 	return uds.PositiveResponse(req.SID, req.Data[1], req.Data[2])
+}
+
+// RegisterScaling adds ReadScalingDataByIdentifier (0x24) to e. A nil cfg
+// disables it. DIDs without scaling data answer NRC 0x31; the DID read
+// access applies.
+func RegisterScaling(e *uds.ECU, cfg *config.Service, store *Store) error {
+	if cfg == nil {
+		return nil
+	}
+	return e.Register(uds.Service{
+		SID:       uds.SIDReadScalingDataByIdentifier,
+		Access:    cfg.Access,
+		MinLength: 3,
+		Handle: func(c *uds.Context, req uds.Request) []byte {
+			if len(req.Data) != 3 {
+				return uds.NegativeResponse(req.SID, uds.NRCInvalidMessageLengthOrFormat)
+			}
+			d := store.Get(binary.BigEndian.Uint16(req.Data[1:3]))
+			if d == nil || d.Scaling == nil {
+				return uds.NegativeResponse(req.SID, uds.NRCRequestOutOfRange)
+			}
+			if nrc := c.CheckAccess(d.Read, uds.NRCRequestOutOfRange); nrc != 0 {
+				return uds.NegativeResponse(req.SID, nrc)
+			}
+			return append(uds.PositiveResponse(req.SID, req.Data[1], req.Data[2]), d.Scaling...)
+		},
+	})
 }

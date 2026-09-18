@@ -47,6 +47,17 @@ type Services struct {
 	RequestUpload            *TransferService       `yaml:"request_upload"`
 	TransferData             *Service               `yaml:"transfer_data"`
 	RequestTransferExit      *Service               `yaml:"request_transfer_exit"`
+	ReadScalingData          *Service               `yaml:"read_scaling_data_by_identifier"`
+	DynamicallyDefineDID     *DDDIService           `yaml:"dynamically_define_data_identifier"`
+}
+
+// DDDIService configures DynamicallyDefineDataIdentifier (0x2C).
+type DDDIService struct {
+	Service      `yaml:",inline"`
+	SubFunctions []SubFunction `yaml:"sub_functions"` // empty = 0x01-0x03
+	Identifiers  []uint16      `yaml:"identifiers"`   // definable DIDs; empty = 0xF200-0xF3FF
+	MaxSources   int           `yaml:"max_sources"`   // per dynamic DID; defaults to 16
+	Read         *Access       `yaml:"read"`          // access to read dynamic DIDs; nil = any
 }
 
 // TransferService configures RequestDownload (0x34) / RequestUpload (0x35).
@@ -145,6 +156,7 @@ type DID struct {
 	Read           *Access          `yaml:"read"`            // nil = readable in any session without security
 	Write          *Access          `yaml:"write"`           // nil = not writable
 	IOControl      *IOControl       `yaml:"io_control"`      // nil = not controllable by 0x2F
+	Scaling        *Data            `yaml:"scaling"`         // scalingByte + extensions for 0x24; nil = none
 }
 
 // IOControl makes a DID controllable by InputOutputControlByIdentifier (0x2F).

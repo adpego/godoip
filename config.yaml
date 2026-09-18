@@ -151,6 +151,16 @@ ecu:
     transfer_data: {}
     request_transfer_exit: {}
 
+    read_scaling_data_by_identifier: {}
+
+    # Dynamic DIDs, readable with ReadDataByIdentifier and cleared when the
+    # default session is entered.
+    dynamically_define_data_identifier:
+      access:
+        sessions: [0x03]
+      # identifiers: [0xF200, 0xF201]   # empty = 0xF200-0xF3FF
+      max_sources: 16
+
   # Data identifiers shared by ReadDataByIdentifier and WriteDataByIdentifier:
   # a successful write changes the value returned by later reads.
   #   ascii / hex      initial value
@@ -162,6 +172,7 @@ ecu:
   #   io_control       controllable with InputOutputControlByIdentifier (0x2F):
   #                      parameters (default 0x00-0x03), default (resetToDefault value),
   #                      enable_mask (shortTermAdjustment carries a mask), access
+  #   scaling          scalingByte + extensions returned by ReadScalingDataByIdentifier (0x24)
   dids:
     - id: 0xF190
       name: VIN
@@ -187,6 +198,7 @@ ecu:
     - id: 0x0100
       name: Calibration value
       hex: "00 64"
+      scaling: {hex: "12 01 02"}    # unsigned numeric, 2 bytes + formula
       read:
         sessions: [0x03]
       write:

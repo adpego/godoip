@@ -79,11 +79,16 @@ ecu:
     transfer_data: {}
     request_transfer_exit: {}
 
+    read_scaling_data_by_identifier: {}
+
+    dynamically_define_data_identifier: {}
+
   dids:
     - id: 0xF190
       ascii: "WBA12345678901234"
     - id: 0xF189
       hex: "01 02 03"
+      scaling: {hex: "41 02"}
     - id: 0x0100
       hex: "00 64"
       read:
