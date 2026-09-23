@@ -61,7 +61,7 @@ func Register(e *uds.ECU, cfg *config.LinkControlService) (*Link, error) {
 
 	return link, e.Register(uds.Service{
 		SID:            uds.SIDLinkControl,
-		Access:         cfg.Access,
+		Config:         cfg.Service,
 		MinLength:      2,
 		HasSubFunction: true,
 		Handle: func(c *uds.Context, req uds.Request) []byte {

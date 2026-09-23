@@ -14,7 +14,7 @@ func Register(e *uds.ECU, cfg *config.Service) error {
 	}
 	return e.Register(uds.Service{
 		SID:            uds.SIDTesterPresent,
-		Access:         cfg.Access,
+		Config:         *cfg,
 		MinLength:      2,
 		HasSubFunction: true,
 		Handle:         handle,

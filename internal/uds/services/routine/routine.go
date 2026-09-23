@@ -95,7 +95,7 @@ func Register(e *uds.ECU, cfg *config.Service, routines []config.Routine, deps D
 
 	return e.Register(uds.Service{
 		SID:            uds.SIDRoutineControl,
-		Access:         cfg.Access,
+		Config:         *cfg,
 		MinLength:      4,
 		HasSubFunction: true,
 		Handle: func(c *uds.Context, req uds.Request) []byte {

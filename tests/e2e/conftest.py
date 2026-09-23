@@ -141,6 +141,12 @@ class RawUDS:
         except TimeoutError:
             return None
 
+    def receive(self, timeout=1.0):
+        try:
+            return bytes(self.doip.receive_diagnostic(timeout=timeout))
+        except TimeoutError:
+            return None
+
     def functional(self, request, timeout=1.0):
         self.doip.send_diagnostic_to_address(FUNCTIONAL_ADDRESS, bytes(request))
         try:

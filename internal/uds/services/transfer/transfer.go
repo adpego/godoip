@@ -93,7 +93,7 @@ func Register(e *uds.ECU, cfg Services, mem *memory.Memory) (*Transfer, error) {
 			return nil, fmt.Errorf("request_download: %w", err)
 		}
 		if err := e.Register(uds.Service{
-			SID: uds.SIDRequestDownload, Access: cfg.Download.Access, MinLength: 5,
+			SID: uds.SIDRequestDownload, Config: cfg.Download.Service, MinLength: 5,
 			Handle: func(c *uds.Context, req uds.Request) []byte { return t.request(c, req, download, rc) },
 		}); err != nil {
 			return nil, err
@@ -105,7 +105,7 @@ func Register(e *uds.ECU, cfg Services, mem *memory.Memory) (*Transfer, error) {
 			return nil, fmt.Errorf("request_upload: %w", err)
 		}
 		if err := e.Register(uds.Service{
-			SID: uds.SIDRequestUpload, Access: cfg.Upload.Access, MinLength: 5,
+			SID: uds.SIDRequestUpload, Config: cfg.Upload.Service, MinLength: 5,
 			Handle: func(c *uds.Context, req uds.Request) []byte { return t.request(c, req, upload, rc) },
 		}); err != nil {
 			return nil, err
@@ -113,14 +113,14 @@ func Register(e *uds.ECU, cfg Services, mem *memory.Memory) (*Transfer, error) {
 	}
 	if cfg.Data != nil {
 		if err := e.Register(uds.Service{
-			SID: uds.SIDTransferData, Access: cfg.Data.Access, MinLength: 2, Handle: t.transferData,
+			SID: uds.SIDTransferData, Config: *cfg.Data, MinLength: 2, Handle: t.transferData,
 		}); err != nil {
 			return nil, err
 		}
 	}
 	if cfg.Exit != nil {
 		if err := e.Register(uds.Service{
-			SID: uds.SIDRequestTransferExit, Access: cfg.Exit.Access, MinLength: 1, Handle: t.exit,
+			SID: uds.SIDRequestTransferExit, Config: *cfg.Exit, MinLength: 1, Handle: t.exit,
 		}); err != nil {
 			return nil, err
 		}

@@ -77,7 +77,7 @@ func Register(e *uds.ECU, cfg *config.DDDIService, store *did.Store, mem *memory
 
 	return e.Register(uds.Service{
 		SID:            uds.SIDDynamicallyDefineDataIdentifier,
-		Access:         cfg.Access,
+		Config:         cfg.Service,
 		MinLength:      2,
 		HasSubFunction: true,
 		Handle:         s.handle,

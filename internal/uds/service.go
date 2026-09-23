@@ -1,6 +1,10 @@
 package uds
 
-import "github.com/adpego/godoip/internal/config"
+import (
+	"time"
+
+	"github.com/adpego/godoip/internal/config"
+)
 
 // Request is a decoded UDS request handed to service handlers.
 type Request struct {
@@ -14,13 +18,13 @@ type Request struct {
 type Handler func(c *Context, req Request) []byte
 
 // Service is a UDS service registered on an ECU. Before Handle is called the
-// ECU checks, in ISO 14229-1 order: service supported, Access (session ->
-// 0x7F, security -> 0x33, forced NRC) and MinLength (0x13).
+// ECU checks, in ISO 14229-1 order: service supported, Config.Access (session
+// -> 0x7F, security -> 0x33, forced NRC) and MinLength (0x13).
 type Service struct {
 	SID            byte
-	Access         config.Access
-	MinLength      int  // minimum request length, SID included
-	HasSubFunction bool // enables suppressPosRspMsgIndicationBit handling
+	Config         config.Service // access and response pending simulation
+	MinLength      int            // minimum request length, SID included
+	HasSubFunction bool           // enables suppressPosRspMsgIndicationBit handling
 	Handle         Handler
 }
 
@@ -47,4 +51,20 @@ func suppressedOnFunctional(nrc byte) bool {
 		return true
 	}
 	return false
+}
+
+// Message is a UDS message sent by the ECU, after waiting Delay.
+type Message struct {
+	Data  []byte
+	Delay time.Duration
+}
+
+// Client is the tester connection a request came from. Services use it to
+// send unsolicited messages (periodic data, response on event) from any
+// goroutine.
+type Client interface {
+	// Send delivers a UDS message to the client.
+	Send(data []byte) error
+	// Done is closed when the client disconnects.
+	Done() <-chan struct{}
 }

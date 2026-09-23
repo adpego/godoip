@@ -20,7 +20,7 @@ func RegisterSetting(e *uds.ECU, cfg *config.Service, store *Store) error {
 	}
 	return e.Register(uds.Service{
 		SID:            uds.SIDControlDTCSetting,
-		Access:         cfg.Access,
+		Config:         *cfg,
 		MinLength:      2,
 		HasSubFunction: true,
 		Handle: func(_ *uds.Context, req uds.Request) []byte {

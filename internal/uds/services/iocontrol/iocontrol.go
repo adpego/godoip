@@ -61,7 +61,7 @@ func Register(e *uds.ECU, cfg *config.Service, dids []config.DID, store *did.Sto
 
 	return e.Register(uds.Service{
 		SID:       uds.SIDInputOutputControlByIdentifier,
-		Access:    cfg.Access,
+		Config:    *cfg,
 		MinLength: 4,
 		Handle: func(ctx *uds.Context, req uds.Request) []byte {
 			return handle(ctx, req, controls, store)

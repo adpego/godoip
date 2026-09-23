@@ -19,7 +19,7 @@ func RegisterRead(e *uds.ECU, cfg *config.ReadMemoryService, m *Memory) error {
 	}
 	return e.Register(uds.Service{
 		SID:       uds.SIDReadMemoryByAddress,
-		Access:    cfg.Access,
+		Config:    cfg.Service,
 		MinLength: 4,
 		Handle: func(c *uds.Context, req uds.Request) []byte {
 			return handleRead(c, req, m, cfg.MaxReadSize)
@@ -59,7 +59,7 @@ func RegisterWrite(e *uds.ECU, cfg *config.Service, m *Memory) error {
 	}
 	return e.Register(uds.Service{
 		SID:       uds.SIDWriteMemoryByAddress,
-		Access:    cfg.Access,
+		Config:    *cfg,
 		MinLength: 5,
 		Handle: func(c *uds.Context, req uds.Request) []byte {
 			return handleWrite(c, req, m)

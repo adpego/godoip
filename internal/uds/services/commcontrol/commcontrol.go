@@ -54,7 +54,7 @@ func Register(e *uds.ECU, cfg *config.CommControlService) (*Controller, error) {
 
 	return ctrl, e.Register(uds.Service{
 		SID:            uds.SIDCommunicationControl,
-		Access:         cfg.Access,
+		Config:         cfg.Service,
 		MinLength:      3,
 		HasSubFunction: true,
 		Handle: func(c *uds.Context, req uds.Request) []byte {

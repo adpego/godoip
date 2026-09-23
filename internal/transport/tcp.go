@@ -91,7 +91,37 @@ type connState struct {
 	conn      net.Conn
 	addr      uint16 // registered source address
 	activated bool
+
+	wmu  sync.Mutex    // serializes writes (responses and unsolicited messages)
+	done chan struct{} // closed when the connection ends
 }
+
+func (c *connState) write(b []byte) error {
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	_, err := c.conn.Write(b)
+	return err
+}
+
+// client is the uds.Client of an activated connection: unsolicited UDS
+// messages are sent as diagnostic messages from the ECU to the tester.
+type client struct {
+	c       *connState
+	version uint8
+	ecuAddr uint16
+	tester  uint16
+}
+
+func (cl client) Send(data []byte) error {
+	select {
+	case <-cl.c.done:
+		return net.ErrClosed
+	default:
+	}
+	return cl.c.write(doip.BuildDiagnosticMsg(cl.version, cl.ecuAddr, cl.tester, data))
+}
+
+func (cl client) Done() <-chan struct{} { return cl.c.done }
 
 func (s *TCPServer) version() uint8 { return s.entity.cfg.DoIPVersion }
 
@@ -101,7 +131,8 @@ func (s *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
 	log.Printf("TCP connection from %s", conn.RemoteAddr())
 
-	c := &connState{conn: conn}
+	c := &connState{conn: conn, done: make(chan struct{})}
+	defer close(c.done)
 	defer func() {
 		if c.activated {
 			s.mu.Lock()
@@ -128,7 +159,7 @@ func (s *TCPServer) handleConn(conn net.Conn) {
 
 		if code, ok := hdr.Validate(s.version(), tcpHandled, s.entity.cfg.MaxDataSize); !ok {
 			log.Printf("TCP generic NACK 0x%02X for header %+v", code, hdr)
-			conn.Write(doip.BuildGenericNack(s.version(), code))
+			c.write(doip.BuildGenericNack(s.version(), code))
 			if code == doip.NackIncorrectPattern || code == doip.NackInvalidPayloadLength {
 				return
 			}
@@ -159,8 +190,7 @@ func (s *TCPServer) handleMessage(c *connState, payloadType uint16, payload []by
 		return s.handleRoutingActivation(c, payload)
 
 	case doip.AliveCheckReq:
-		_, err := c.conn.Write(doip.BuildAliveCheckResponse(s.version(), s.entity.cfg.LogicalAddress))
-		return err == nil
+		return c.write(doip.BuildAliveCheckResponse(s.version(), s.entity.cfg.LogicalAddress)) == nil
 
 	case doip.AliveCheckResp:
 		return true // only meaningful as an answer to our own alive checks
@@ -180,7 +210,7 @@ func (s *TCPServer) handleDiagnosticMessage(c *connState, payload []byte) bool {
 	log.Printf("Diagnostic message: src=0x%04X target=0x%04X uds=% X", msg.SourceAddress, msg.TargetAddress, msg.UserData)
 
 	nack := func(code uint8) {
-		c.conn.Write(doip.BuildDiagnosticNack(s.version(), msg.TargetAddress, msg.SourceAddress, code))
+		c.write(doip.BuildDiagnosticNack(s.version(), msg.TargetAddress, msg.SourceAddress, code))
 	}
 
 	// Source address must be activated on this socket; otherwise close it.
@@ -197,21 +227,20 @@ func (s *TCPServer) handleDiagnosticMessage(c *connState, payload []byte) bool {
 	}
 
 	ack := doip.BuildDiagnosticAck(s.version(), msg.TargetAddress, msg.SourceAddress)
-	if _, err := c.conn.Write(ack); err != nil {
+	if err := c.write(ack); err != nil {
 		log.Printf("diagnostic ack write error: %v", err)
 		return false
 	}
 
 	// Responses always come from the ECU physical address, even for
 	// functional requests.
-	udsResp := s.ecu.Handle(msg.UserData, functional)
-	if udsResp == nil {
-		return true
-	}
-	resp := doip.BuildDiagnosticMsg(s.version(), s.entity.cfg.LogicalAddress, msg.SourceAddress, udsResp)
-	if _, err := c.conn.Write(resp); err != nil {
-		log.Printf("diagnostic response write error: %v", err)
-		return false
+	cl := client{c: c, version: s.version(), ecuAddr: s.entity.cfg.LogicalAddress, tester: msg.SourceAddress}
+	for _, m := range s.ecu.Process(cl, msg.UserData, functional) {
+		time.Sleep(m.Delay)
+		if err := cl.Send(m.Data); err != nil {
+			log.Printf("diagnostic response write error: %v", err)
+			return false
+		}
 	}
 	return true
 }
@@ -226,7 +255,7 @@ func (s *TCPServer) handleRoutingActivation(c *connState, payload []byte) bool {
 
 	code := s.activate(c, req)
 	resp := doip.BuildRoutingActivationResponse(s.version(), req.SourceAddress, s.entity.cfg.LogicalAddress, code)
-	if _, err := c.conn.Write(resp); err != nil {
+	if err := c.write(resp); err != nil {
 		log.Printf("routing activation response write error: %v", err)
 		return false
 	}

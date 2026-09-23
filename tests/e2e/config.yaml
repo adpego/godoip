@@ -79,7 +79,10 @@ ecu:
     transfer_data: {}
     request_transfer_exit: {}
 
-    read_scaling_data_by_identifier: {}
+    read_scaling_data_by_identifier:
+      response_pending:
+        count: 2
+        interval_ms: 100
 
     dynamically_define_data_identifier: {}
 

@@ -3,9 +3,14 @@ from udsoncan import DynamicDidDefinition, MemoryLocation
 from conftest import nrc
 
 
-def test_read_scaling_data(uds):
-    assert uds([0x24, 0xF1, 0x89]) == bytes([0x64, 0xF1, 0x89, 0x41, 0x02])
-    assert uds([0x24, 0xF1, 0x90]) == nrc(0x24, 0x31)
+def test_read_scaling_data_with_response_pending(uds):
+    # Configured to answer NRC 0x78 twice before the final response.
+    assert uds([0x24, 0xF1, 0x89]) == nrc(0x24, 0x78)
+    assert uds.receive() == nrc(0x24, 0x78)
+    assert uds.receive() == bytes([0x64, 0xF1, 0x89, 0x41, 0x02])
+    assert uds([0x24, 0xF1, 0x90]) == nrc(0x24, 0x78)
+    uds.receive()
+    assert uds.receive() == nrc(0x24, 0x31)
 
 
 def test_define_by_identifier(client, uds):

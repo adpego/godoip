@@ -10,6 +10,8 @@ import (
 	"io"
 	"sync"
 	"time"
+
+	"github.com/adpego/godoip/internal/config"
 )
 
 const defaultS3Timeout = 5000 * time.Millisecond
@@ -113,10 +115,22 @@ func (e *ECU) SecurityLevel() uint8 {
 	return l
 }
 
-// Handle processes a UDS request and returns the response. It returns nil when
-// no response must be sent (suppressPosRspMsgIndicationBit or suppressed NRC
-// on a functional request).
+// Handle processes a UDS request and returns the final response, or nil when
+// no response must be sent. Response pending messages are not returned.
 func (e *ECU) Handle(data []byte, functional bool) []byte {
+	msgs := e.Process(nil, data, functional)
+	if len(msgs) == 0 {
+		return nil
+	}
+	return msgs[len(msgs)-1].Data
+}
+
+// Process handles a UDS request from client (which may be nil) and returns
+// the messages to send, in order. It returns nothing when no response must be
+// sent (suppressPosRspMsgIndicationBit, or suppressed NRC on a functional
+// request). With response pending simulation, NRC 0x78 messages precede the
+// final response, which is then always sent.
+func (e *ECU) Process(client Client, data []byte, functional bool) []Message {
 	if len(data) == 0 {
 		return nil
 	}
@@ -125,34 +139,55 @@ func (e *ECU) Handle(data []byte, functional bool) []byte {
 	defer e.mu.Unlock()
 
 	e.ctx.checkS3()
-	resp, suppressPositive := e.dispatch(data)
+	e.ctx.client = client
+	resp, suppressPositive, pending := e.dispatch(data)
+	e.ctx.client = nil
 	e.ctx.lastActivity = e.ctx.now()
 
-	if isNegative(resp) {
-		if functional && suppressedOnFunctional(resp[2]) {
-			return nil
-		}
-		return resp
-	}
-	if suppressPositive {
+	if isNegative(resp) && functional && suppressedOnFunctional(resp[2]) {
 		return nil
 	}
-	return resp
+	if pending == nil {
+		if !isNegative(resp) && suppressPositive {
+			return nil
+		}
+		return []Message{{Data: resp}}
+	}
+
+	count, interval := 1, time.Second
+	if pending.Count > 0 {
+		count = pending.Count
+	}
+	if pending.IntervalMs > 0 {
+		interval = time.Duration(pending.IntervalMs) * time.Millisecond
+	}
+	msgs := make([]Message, 0, count+1)
+	for i := range count {
+		delay := interval
+		if i == 0 {
+			delay = 0
+		}
+		msgs = append(msgs, Message{Data: NegativeResponse(data[0], NRCRequestReceivedResponsePending), Delay: delay})
+	}
+	// After NRC 0x78 the final response is sent even if suppression was requested.
+	return append(msgs, Message{Data: resp, Delay: interval})
 }
 
 // dispatch applies the generic checks of ISO 14229-1 (figure 5) and hands the
 // request to the service handler.
-func (e *ECU) dispatch(data []byte) ([]byte, bool) {
+// The response pending configuration is returned only for requests that
+// reach the service handler.
+func (e *ECU) dispatch(data []byte) ([]byte, bool, *config.ResponsePending) {
 	sid := data[0]
 	svc, ok := e.services[sid]
 	if !ok {
-		return NegativeResponse(sid, NRCServiceNotSupported), false
+		return NegativeResponse(sid, NRCServiceNotSupported), false, nil
 	}
-	if nrc := e.ctx.CheckAccess(svc.Access, NRCServiceNotSupportedInActiveSession); nrc != 0 {
-		return NegativeResponse(sid, nrc), false
+	if nrc := e.ctx.CheckAccess(svc.Config.Access, NRCServiceNotSupportedInActiveSession); nrc != 0 {
+		return NegativeResponse(sid, nrc), false, nil
 	}
 	if len(data) < max(svc.MinLength, 1) || (svc.HasSubFunction && len(data) < 2) {
-		return NegativeResponse(sid, NRCInvalidMessageLengthOrFormat), false
+		return NegativeResponse(sid, NRCInvalidMessageLengthOrFormat), false, nil
 	}
 
 	req := Request{SID: sid, Data: data}
@@ -161,5 +196,5 @@ func (e *ECU) dispatch(data []byte) ([]byte, bool) {
 		req.SubFunction = data[1] &^ SuppressPosRspBit
 		suppress = data[1]&SuppressPosRspBit != 0
 	}
-	return svc.Handle(&e.ctx, req), suppress
+	return svc.Handle(&e.ctx, req), suppress, svc.Config.ResponsePending
 }

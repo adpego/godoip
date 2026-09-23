@@ -43,7 +43,12 @@ func testEntity() *Entity {
 
 func newTCPServer(t *testing.T, entity *Entity) *TCPServer {
 	t.Helper()
-	ecu, err := services.New(config.ECU{Services: config.Services{TesterPresent: &config.Service{}}})
+	ecu, err := services.New(config.ECU{Services: config.Services{
+		TesterPresent: &config.Service{},
+		ECUReset: &config.ECUResetService{Service: config.Service{
+			ResponsePending: &config.ResponsePending{Count: 2, IntervalMs: 20},
+		}},
+	}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,6 +151,18 @@ func TestRoutingActivationAndDiagnostic(t *testing.T) {
 
 	// Re-activating the same address on the same socket is accepted.
 	activate(t, c, clientAddr)
+}
+
+func TestResponsePending(t *testing.T) {
+	c := dial(t, newTCPServer(t, testEntity()))
+	activate(t, c, clientAddr)
+	send(t, c, doip.DiagnosticMessage, diag(clientAddr, ecuAddr, 0x11, 0x81))
+	expect(t, c, doip.BuildDiagnosticAck(version, ecuAddr, clientAddr))
+	pending := doip.BuildDiagnosticMsg(version, ecuAddr, clientAddr, []byte{0x7F, 0x11, 0x78})
+	expect(t, c, pending)
+	expect(t, c, pending)
+	// Sent despite the suppress bit because 0x78 was sent.
+	expect(t, c, doip.BuildDiagnosticMsg(version, ecuAddr, clientAddr, []byte{0x51, 0x01}))
 }
 
 func TestFunctionalDiagnostic(t *testing.T) {

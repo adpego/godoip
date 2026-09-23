@@ -122,7 +122,7 @@ func Register(e *uds.ECU, cfg *config.SecurityAccessService) error {
 
 	return e.Register(uds.Service{
 		SID:            uds.SIDSecurityAccess,
-		Access:         cfg.Access,
+		Config:         cfg.Service,
 		MinLength:      2,
 		HasSubFunction: true,
 		Handle:         s.handle,

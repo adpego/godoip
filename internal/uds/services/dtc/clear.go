@@ -44,7 +44,7 @@ func RegisterClear(e *uds.ECU, cfg *config.ClearDTCService, store *Store) error 
 
 	return e.Register(uds.Service{
 		SID:       uds.SIDClearDiagnosticInformation,
-		Access:    cfg.Access,
+		Config:    cfg.Service,
 		MinLength: 4,
 		Handle: func(_ *uds.Context, req uds.Request) []byte {
 			// An optional MemorySelection byte may follow the group.

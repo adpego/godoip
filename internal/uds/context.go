@@ -23,7 +23,13 @@ type Context struct {
 
 	sessionListeners []func(from, to uint8)
 	resetListeners   []func()
+
+	client Client // client of the request being processed, may be nil
 }
+
+// Client returns the client that sent the request being processed, or nil
+// when unknown (e.g. requests handled with ECU.Handle).
+func (c *Context) Client() Client { return c.client }
 
 // Now returns the current time of the ECU clock.
 func (c *Context) Now() time.Time { return c.now() }

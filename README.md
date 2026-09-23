@@ -66,7 +66,7 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | Functional addressing (NRC 0x11/0x12/0x31/0x7E/0x7F suppressed) | ✅ | ✅ | ✅ |
 | S3 session timeout                                             | ✅ | ✅ | ✅ |
 | Security relock on session change / reset                      | ✅ | ✅ | ✅ |
-| Response pending (NRC 0x78) simulation                         | ❌ |    |    |
+| Response pending (NRC 0x78) simulation, per service           | ✅ | ✅ | ✅ |
 
 ### DoIP (ISO 13400-2)
 
@@ -95,7 +95,9 @@ See [`config.yaml`](config.yaml) for a complete, commented example.
   (`enabled: false` to disable them); node type, power mode, socket limits,
   activation types and inactivity timers are configurable too.
 - `ecu.services`: a service missing from this map is not supported (NRC 0x11);
-  use `{}` to enable it with defaults. Every service accepts an `access` block.
+  use `{}` to enable it with defaults. Every service accepts an `access` block
+  and a `response_pending: {count, interval_ms}` block to simulate a slow ECU
+  (NRC 0x78 before the final response).
 - `access` (services, sessions, reset types, security levels, DIDs, memory
   regions, routines, DTC report types...):
   ```yaml

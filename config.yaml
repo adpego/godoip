@@ -39,6 +39,10 @@ ecu:
 
   # A service missing from this list is not supported (NRC 0x11).
   # Use `{}` to enable a service with its default settings.
+  # Every service accepts `access` and `response_pending`:
+  #   response_pending:
+  #     count: 2           # NRC 0x78 messages before the final response
+  #     interval_ms: 1000  # time between them (keep it below P2*)
   services:
     diagnostic_session_control:
       sessions:
@@ -98,7 +102,10 @@ ecu:
       access:
         sessions: [0x02, 0x03]
 
-    routine_control: {}
+    routine_control:
+      response_pending:
+        count: 1
+        interval_ms: 500
 
     read_dtc_information:
       status_availability_mask: 0xFF

@@ -14,7 +14,7 @@ func RegisterRead(e *uds.ECU, cfg *config.ReadDIDService, store *Store) error {
 	}
 	return e.Register(uds.Service{
 		SID:       uds.SIDReadDataByIdentifier,
-		Access:    cfg.Access,
+		Config:    cfg.Service,
 		MinLength: 3,
 		Handle: func(c *uds.Context, req uds.Request) []byte {
 			return handleRead(c, req, store, cfg.MaxDIDsPerRequest)
@@ -65,7 +65,7 @@ func RegisterWrite(e *uds.ECU, cfg *config.Service, store *Store) error {
 	}
 	return e.Register(uds.Service{
 		SID:       uds.SIDWriteDataByIdentifier,
-		Access:    cfg.Access,
+		Config:    *cfg,
 		MinLength: 4,
 		Handle: func(c *uds.Context, req uds.Request) []byte {
 			return handleWrite(c, req, store)
@@ -100,7 +100,7 @@ func RegisterScaling(e *uds.ECU, cfg *config.Service, store *Store) error {
 	}
 	return e.Register(uds.Service{
 		SID:       uds.SIDReadScalingDataByIdentifier,
-		Access:    cfg.Access,
+		Config:    *cfg,
 		MinLength: 3,
 		Handle: func(c *uds.Context, req uds.Request) []byte {
 			if len(req.Data) != 3 {

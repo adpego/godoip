@@ -41,7 +41,7 @@ func Register(e *uds.ECU, cfg *config.ECUResetService) error {
 
 	return e.Register(uds.Service{
 		SID:            uds.SIDECUReset,
-		Access:         cfg.Access,
+		Config:         cfg.Service,
 		MinLength:      2,
 		HasSubFunction: true,
 		Handle: func(c *uds.Context, req uds.Request) []byte {

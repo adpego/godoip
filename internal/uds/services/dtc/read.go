@@ -86,7 +86,7 @@ func RegisterRead(e *uds.ECU, cfg *config.ReadDTCService, store *Store) error {
 
 	return e.Register(uds.Service{
 		SID:            uds.SIDReadDTCInformation,
-		Access:         cfg.Access,
+		Config:         cfg.Service,
 		MinLength:      2,
 		HasSubFunction: true,
 		Handle:         r.handle,

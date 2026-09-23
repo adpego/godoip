@@ -14,7 +14,7 @@ import (
 func echo(sid byte, access config.Access) uds.Service {
 	return uds.Service{
 		SID:            sid,
-		Access:         access,
+		Config:         config.Service{Access: access},
 		MinLength:      2,
 		HasSubFunction: true,
 		Handle: func(c *uds.Context, req uds.Request) []byte {
@@ -168,6 +168,92 @@ func TestCheckAccess(t *testing.T) {
 		}
 		if got := c.CheckAccess(config.Access{}, 0x31); got != 0 {
 			t.Errorf("open: got 0x%02X", got)
+		}
+	})
+}
+
+// --- Process: response pending and clients ---
+
+type fakeClient struct{ done chan struct{} }
+
+func (f *fakeClient) Send([]byte) error     { return nil }
+func (f *fakeClient) Done() <-chan struct{} { return f.done }
+
+func TestProcessWithoutPending(t *testing.T) {
+	e, _ := newECU(t, echo(0x3E, config.Access{}))
+	msgs := e.Process(nil, []byte{0x3E, 0x00}, false)
+	if len(msgs) != 1 || !bytes.Equal(msgs[0].Data, []byte{0x7E, 0x00}) || msgs[0].Delay != 0 {
+		t.Errorf("got %+v", msgs)
+	}
+	if msgs := e.Process(nil, []byte{0x3E, 0x80}, false); len(msgs) != 0 {
+		t.Errorf("suppressed: got %+v", msgs)
+	}
+}
+
+func TestProcessResponsePending(t *testing.T) {
+	svc := echo(0x3E, config.Access{})
+	svc.Config.ResponsePending = &config.ResponsePending{Count: 2, IntervalMs: 100}
+	e, _ := newECU(t, svc)
+
+	msgs := e.Process(nil, []byte{0x3E, 0x00}, false)
+	pending := udstest.NRC(0x3E, uds.NRCRequestReceivedResponsePending)
+	want := []uds.Message{
+		{Data: pending, Delay: 0},
+		{Data: pending, Delay: 100 * time.Millisecond},
+		{Data: []byte{0x7E, 0x00}, Delay: 100 * time.Millisecond},
+	}
+	if len(msgs) != len(want) {
+		t.Fatalf("got %+v", msgs)
+	}
+	for i := range want {
+		if !bytes.Equal(msgs[i].Data, want[i].Data) || msgs[i].Delay != want[i].Delay {
+			t.Errorf("message %d: got %+v, want %+v", i, msgs[i], want[i])
+		}
+	}
+
+	// After 0x78 the positive response is sent even when suppressed.
+	msgs = e.Process(nil, []byte{0x3E, 0x80}, false)
+	if len(msgs) != 3 || !bytes.Equal(msgs[2].Data, []byte{0x7E, 0x00}) {
+		t.Errorf("suppressed with pending: got %+v", msgs)
+	}
+	// Handle returns only the final response.
+	udstest.Send(t, e, []byte{0x3E, 0x00}, []byte{0x7E, 0x00})
+}
+
+func TestProcessPendingDefaults(t *testing.T) {
+	svc := echo(0x3E, config.Access{})
+	svc.Config.ResponsePending = &config.ResponsePending{}
+	e, _ := newECU(t, svc)
+	msgs := e.Process(nil, []byte{0x3E, 0x00}, false)
+	if len(msgs) != 2 || msgs[1].Delay != time.Second {
+		t.Errorf("got %+v", msgs)
+	}
+}
+
+func TestProcessPendingNotUsedForGenericNRCs(t *testing.T) {
+	svc := echo(0x3E, config.Access{Sessions: []uint8{uds.SessionExtended}})
+	svc.Config.ResponsePending = &config.ResponsePending{Count: 1}
+	e, _ := newECU(t, svc)
+	msgs := e.Process(nil, []byte{0x3E, 0x00}, false)
+	if len(msgs) != 1 || !bytes.Equal(msgs[0].Data, udstest.NRC(0x3E, uds.NRCServiceNotSupportedInActiveSession)) {
+		t.Errorf("got %+v", msgs)
+	}
+}
+
+func TestContextClient(t *testing.T) {
+	var seen uds.Client
+	e, _ := newECU(t, uds.Service{SID: 0x3E, Handle: func(c *uds.Context, req uds.Request) []byte {
+		seen = c.Client()
+		return uds.PositiveResponse(req.SID)
+	}})
+	client := &fakeClient{done: make(chan struct{})}
+	e.Process(client, []byte{0x3E}, false)
+	if seen != client {
+		t.Error("handler should see the requesting client")
+	}
+	e.Do(func(c *uds.Context) {
+		if c.Client() != nil {
+			t.Error("client must be cleared after the request")
 		}
 	})
 }

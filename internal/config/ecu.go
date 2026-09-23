@@ -21,7 +21,15 @@ type Access struct {
 
 // Service holds the settings shared by every UDS service.
 type Service struct {
-	Access Access `yaml:"access"`
+	Access          Access           `yaml:"access"`
+	ResponsePending *ResponsePending `yaml:"response_pending"` // simulate NRC 0x78 before the final response
+}
+
+// ResponsePending simulates a slow service: Count NRC 0x78 responses are sent,
+// IntervalMs apart, before the final response.
+type ResponsePending struct {
+	Count      int `yaml:"count"`       // defaults to 1
+	IntervalMs int `yaml:"interval_ms"` // defaults to 1000 (must stay below P2*)
 }
 
 // Services lists the UDS services supported by the ECU. A nil entry means the
