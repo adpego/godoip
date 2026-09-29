@@ -38,7 +38,7 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | 0x27 | SecurityAccess                   | ✅ | ✅ | ✅ | Fixed/random seeds, xor/add/not/fixed/seed algorithms, lockout |
 | 0x28 | CommunicationControl             | ✅ | ✅ | ✅ | Control types 0x00–0x05, communication type filter, reset on default session |
 | 0x29 | Authentication                   | ❌ |    |    | |
-| 0x2A | ReadDataByPeriodicIdentifier     | ❌ |    |    | |
+| 0x2A | ReadDataByPeriodicIdentifier     | ✅ | ✅ | ✅ | Slow/medium/fast rates, stop, message type 1/2, works with dynamic DIDs |
 | 0x2C | DynamicallyDefineDataIdentifier  | ✅ | ✅ | ✅ | By identifier, by memory address, clear; computed at read time |
 | 0x2E | WriteDataByIdentifier            | ✅ | ✅ | ✅ | Writes are visible to later reads; fixed/variable length, volatile DIDs |
 | 0x2F | InputOutputControlByIdentifier   | ✅ | ✅ | ✅ | Per-DID control, all 4 parameters, enable mask, auto return on default session |
@@ -124,7 +124,7 @@ internal/uds/               UDS core: ECU, dispatcher, session/security state, a
 internal/uds/udstest/       test helpers for services
 internal/uds/services/      one package per service + services.New wiring them all
   session/ ecureset/ security/ testerpresent/ did/ dtc/ memory/ routine/
-  iocontrol/ commcontrol/ linkcontrol/ transfer/ dddi/
+  iocontrol/ commcontrol/ linkcontrol/ transfer/ dddi/ periodic/
 tests/e2e/                  pytest suite using doipclient + udsoncan
 firmware/                   sample firmware for config.yaml
 ```

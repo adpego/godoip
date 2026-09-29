@@ -86,6 +86,11 @@ ecu:
 
     dynamically_define_data_identifier: {}
 
+    read_data_by_periodic_identifier:
+      fast_ms: 50
+      medium_ms: 100
+      slow_ms: 200
+
   dids:
     - id: 0xF190
       ascii: "WBA12345678901234"

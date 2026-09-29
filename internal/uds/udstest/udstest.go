@@ -3,6 +3,7 @@ package udstest
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -54,5 +55,54 @@ func Must(t testing.TB, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Client is a uds.Client recording unsolicited messages.
+type Client struct {
+	Messages chan []byte
+	done     chan struct{}
+}
+
+// NewClient returns a connected client.
+func NewClient() *Client {
+	return &Client{Messages: make(chan []byte, 100), done: make(chan struct{})}
+}
+
+func (c *Client) Send(data []byte) error {
+	select {
+	case <-c.done:
+		return errors.New("client disconnected")
+	default:
+	}
+	c.Messages <- append([]byte(nil), data...)
+	return nil
+}
+
+func (c *Client) Done() <-chan struct{} { return c.done }
+
+// Disconnect closes the client.
+func (c *Client) Disconnect() { close(c.done) }
+
+// Next waits for the next unsolicited message, or returns nil after timeout.
+func (c *Client) Next(timeout time.Duration) []byte {
+	select {
+	case m := <-c.Messages:
+		return m
+	case <-time.After(timeout):
+		return nil
+	}
+}
+
+// SendFrom issues a request from client and checks the final response.
+func SendFrom(t testing.TB, e *uds.ECU, client uds.Client, req []byte, want []byte) {
+	t.Helper()
+	msgs := e.Process(client, req, false)
+	var got []byte
+	if len(msgs) > 0 {
+		got = msgs[len(msgs)-1].Data
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("request % X: got % X, want % X", req, got, want)
 	}
 }

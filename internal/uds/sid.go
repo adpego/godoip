@@ -8,6 +8,7 @@ const (
 	SIDReadDTCInformation              byte = 0x19
 	SIDReadDataByIdentifier            byte = 0x22
 	SIDReadScalingDataByIdentifier     byte = 0x24
+	SIDReadDataByPeriodicIdentifier    byte = 0x2A
 	SIDDynamicallyDefineDataIdentifier byte = 0x2C
 	SIDReadMemoryByAddress             byte = 0x23
 	SIDSecurityAccess                  byte = 0x27

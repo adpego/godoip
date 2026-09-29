@@ -57,6 +57,18 @@ type Services struct {
 	RequestTransferExit      *Service               `yaml:"request_transfer_exit"`
 	ReadScalingData          *Service               `yaml:"read_scaling_data_by_identifier"`
 	DynamicallyDefineDID     *DDDIService           `yaml:"dynamically_define_data_identifier"`
+	ReadDataByPeriodicID     *PeriodicService       `yaml:"read_data_by_periodic_identifier"`
+}
+
+// PeriodicService configures ReadDataByPeriodicIdentifier (0x2A). Periodic
+// identifier 0xNN reads DID 0xF2NN (static or dynamically defined).
+type PeriodicService struct {
+	Service         `yaml:",inline"`
+	SlowMs          int `yaml:"slow_ms"`           // transmissionMode 0x01; defaults to 1000
+	MediumMs        int `yaml:"medium_ms"`         // transmissionMode 0x02; defaults to 300
+	FastMs          int `yaml:"fast_ms"`           // transmissionMode 0x03; defaults to 100
+	MaxPeriodicDIDs int `yaml:"max_periodic_dids"` // scheduled at the same time; defaults to 8
+	MessageType     int `yaml:"message_type"`      // 1: 0x6A + pDID + data (default), 2: pDID + data
 }
 
 // DDDIService configures DynamicallyDefineDataIdentifier (0x2C).
