@@ -58,6 +58,7 @@ func New(opts ...Option) *ECU {
 		},
 		services: make(map[byte]Service),
 	}
+	e.ctx.ecu = e
 	for _, opt := range opts {
 		opt(e)
 	}

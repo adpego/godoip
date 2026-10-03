@@ -20,6 +20,7 @@ import (
 	"github.com/adpego/godoip/internal/uds/services/linkcontrol"
 	"github.com/adpego/godoip/internal/uds/services/memory"
 	"github.com/adpego/godoip/internal/uds/services/periodic"
+	"github.com/adpego/godoip/internal/uds/services/roe"
 	"github.com/adpego/godoip/internal/uds/services/routine"
 	"github.com/adpego/godoip/internal/uds/services/security"
 	"github.com/adpego/godoip/internal/uds/services/session"
@@ -62,6 +63,9 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 		{"read_scaling_data_by_identifier", func() error { return did.RegisterScaling(e, svc.ReadScalingData, dids) }},
 		{"dynamically_define_data_identifier", func() error { return dddi.Register(e, svc.DynamicallyDefineDID, dids, mem) }},
 		{"read_data_by_periodic_identifier", func() error { return periodic.Register(e, svc.ReadDataByPeriodicID, dids) }},
+		{"response_on_event", func() error {
+			return roe.Register(e, svc.ResponseOnEvent, roe.Deps{DIDs: dids, DTCs: dtcs})
+		}},
 		{"input_output_control_by_identifier", func() error { return iocontrol.Register(e, svc.IOControl, cfg.DIDs, dids) }},
 		{"read_memory_by_address", func() error { return memory.RegisterRead(e, svc.ReadMemoryByAddress, mem) }},
 		{"write_memory_by_address", func() error { return memory.RegisterWrite(e, svc.WriteMemoryByAddress, mem) }},

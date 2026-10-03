@@ -178,6 +178,19 @@ ecu:
       max_periodic_dids: 8
       message_type: 1          # 1: 6A pDID data, 2: pDID data
 
+    # Events: onDTCStatusChange (0x01), onTimerInterrupt (0x02),
+    # onChangeOfDataIdentifier (0x03). eventWindowTime 0x02 = infinite,
+    # other values are seconds.
+    response_on_event:
+      access:
+        sessions: [0x03]
+      max_events: 4
+      poll_ms: 50
+      slow_ms: 1000              # timer rates
+      medium_ms: 300
+      fast_ms: 100
+      allowed_services: [0x19, 0x22, 0x31]
+
   # Data identifiers shared by ReadDataByIdentifier and WriteDataByIdentifier:
   # a successful write changes the value returned by later reads.
   #   ascii / hex      initial value

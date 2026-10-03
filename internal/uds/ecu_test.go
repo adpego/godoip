@@ -257,3 +257,18 @@ func TestContextClient(t *testing.T) {
 		}
 	})
 }
+
+func TestContextExecute(t *testing.T) {
+	e, _ := newECU(t, echo(0x3E, config.Access{}))
+	e.Do(func(c *uds.Context) {
+		if got := c.Execute([]byte{0x3E, 0x80}); !bytes.Equal(got, []byte{0x7E, 0x00}) {
+			t.Errorf("suppression must be ignored: got % X", got)
+		}
+		if got := c.Execute([]byte{0x22}); !bytes.Equal(got, udstest.NRC(0x22, uds.NRCServiceNotSupported)) {
+			t.Errorf("unsupported: got % X", got)
+		}
+		if got := c.Execute(nil); got != nil {
+			t.Errorf("empty: got % X", got)
+		}
+	})
+}

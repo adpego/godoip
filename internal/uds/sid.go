@@ -22,6 +22,7 @@ const (
 	SIDRequestTransferExit             byte = 0x37
 	SIDWriteMemoryByAddress            byte = 0x3D
 	SIDTesterPresent                   byte = 0x3E
+	SIDResponseOnEvent                 byte = 0x86
 	SIDControlDTCSetting               byte = 0x85
 	SIDLinkControl                     byte = 0x87
 

@@ -25,6 +25,18 @@ type Context struct {
 	resetListeners   []func()
 
 	client Client // client of the request being processed, may be nil
+	ecu    *ECU
+}
+
+// Execute processes a UDS request internally (e.g. the service to respond to
+// of ResponseOnEvent) and returns its response, ignoring response
+// suppression and response pending simulation.
+func (c *Context) Execute(data []byte) []byte {
+	if len(data) == 0 {
+		return nil
+	}
+	resp, _, _ := c.ecu.dispatch(data)
+	return resp
 }
 
 // Client returns the client that sent the request being processed, or nil

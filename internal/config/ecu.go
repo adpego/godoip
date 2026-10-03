@@ -58,6 +58,19 @@ type Services struct {
 	ReadScalingData          *Service               `yaml:"read_scaling_data_by_identifier"`
 	DynamicallyDefineDID     *DDDIService           `yaml:"dynamically_define_data_identifier"`
 	ReadDataByPeriodicID     *PeriodicService       `yaml:"read_data_by_periodic_identifier"`
+	ResponseOnEvent          *ROEService            `yaml:"response_on_event"`
+}
+
+// ROEService configures ResponseOnEvent (0x86).
+type ROEService struct {
+	Service         `yaml:",inline"`
+	EventTypes      []SubFunction `yaml:"event_types"`      // empty = 0x00-0x06
+	MaxEvents       int           `yaml:"max_events"`       // events set up at the same time; defaults to 4
+	PollMs          int           `yaml:"poll_ms"`          // event detection period; defaults to 50
+	SlowMs          int           `yaml:"slow_ms"`          // onTimerInterrupt rate 0x01; defaults to 1000
+	MediumMs        int           `yaml:"medium_ms"`        // rate 0x02; defaults to 300
+	FastMs          int           `yaml:"fast_ms"`          // rate 0x03; defaults to 100
+	AllowedServices []uint8       `yaml:"allowed_services"` // serviceToRespondTo SIDs; empty = any
 }
 
 // PeriodicService configures ReadDataByPeriodicIdentifier (0x2A). Periodic

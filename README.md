@@ -53,7 +53,7 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | 0x83 | AccessTimingParameter            | ❌ |    |    | Withdrawn in ISO 14229-1:2020 |
 | 0x84 | SecuredDataTransmission          | ❌ |    |    | |
 | 0x85 | ControlDTCSetting                | ✅ | ✅ | ✅ | Blocks DTC status updates, re-enabled in default session |
-| 0x86 | ResponseOnEvent                  | ❌ |    |    | |
+| 0x86 | ResponseOnEvent                  | ⚠️ | ✅ | ✅ | Events 0x00–0x06 (DTC status, timer, DID change); onComparisonOfValues not implemented |
 | 0x87 | LinkControl                      | ✅ | ✅ | ✅ | Fixed/specific baudrate verification and transition |
 
 ### Generic UDS behaviour
@@ -124,7 +124,7 @@ internal/uds/               UDS core: ECU, dispatcher, session/security state, a
 internal/uds/udstest/       test helpers for services
 internal/uds/services/      one package per service + services.New wiring them all
   session/ ecureset/ security/ testerpresent/ did/ dtc/ memory/ routine/
-  iocontrol/ commcontrol/ linkcontrol/ transfer/ dddi/ periodic/
+  iocontrol/ commcontrol/ linkcontrol/ transfer/ dddi/ periodic/ roe/
 tests/e2e/                  pytest suite using doipclient + udsoncan
 firmware/                   sample firmware for config.yaml
 ```

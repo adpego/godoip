@@ -86,6 +86,10 @@ ecu:
 
     dynamically_define_data_identifier: {}
 
+    response_on_event:
+      poll_ms: 20
+      fast_ms: 100
+
     read_data_by_periodic_identifier:
       fast_ms: 50
       medium_ms: 100
