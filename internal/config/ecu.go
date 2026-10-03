@@ -59,6 +59,17 @@ type Services struct {
 	DynamicallyDefineDID     *DDDIService           `yaml:"dynamically_define_data_identifier"`
 	ReadDataByPeriodicID     *PeriodicService       `yaml:"read_data_by_periodic_identifier"`
 	ResponseOnEvent          *ROEService            `yaml:"response_on_event"`
+	RequestFileTransfer      *FileTransferService   `yaml:"request_file_transfer"`
+}
+
+// FileTransferService configures RequestFileTransfer (0x38). Every path is
+// relative to Root and cannot escape it.
+type FileTransferService struct {
+	Service        `yaml:",inline"`
+	Root           string  `yaml:"root"`             // directory exposed to the client (relative to the config file)
+	Modes          []uint8 `yaml:"modes"`            // supported modeOfOperation; empty = 0x01-0x05
+	MaxBlockLength uint32  `yaml:"max_block_length"` // defaults to 1026
+	MaxFileSize    uint64  `yaml:"max_file_size"`    // largest file accepted; 0 = unlimited
 }
 
 // ROEService configures ResponseOnEvent (0x86).

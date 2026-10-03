@@ -155,6 +155,14 @@ ecu:
     request_upload:
       access:
         sessions: [0x02, 0x03]
+    # Files under `root` (relative to this file) are exposed to
+    # RequestFileTransfer; paths can never escape it.
+    request_file_transfer:
+      access:
+        sessions: [0x02, 0x03]
+      root: firmware/files
+      modes: [0x01, 0x02, 0x03, 0x04, 0x05]   # add, delete, replace, read, read dir
+      max_file_size: 1048576
     transfer_data: {}
     request_transfer_exit: {}
 

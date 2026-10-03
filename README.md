@@ -47,7 +47,7 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | 0x35 | RequestUpload                    | ✅ | ✅ | ✅ | Reads from the memory image |
 | 0x36 | TransferData                     | ✅ | ✅ | ✅ | Block sequence counter (wraps), repeated blocks, max block length |
 | 0x37 | RequestTransferExit              | ✅ | ✅ | ✅ | Rejects incomplete transfers |
-| 0x38 | RequestFileTransfer              | ❌ |    |    | |
+| 0x38 | RequestFileTransfer              | ⚠️ | ✅ | ✅ | Add/delete/replace/read file, read dir in a sandboxed root; resumeFile not implemented |
 | 0x3D | WriteMemoryByAddress             | ✅ | ✅ | ✅ | Persisted to a separate output file, the input file is never modified |
 | 0x3E | TesterPresent                    | ✅ | ✅ | ✅ | |
 | 0x83 | AccessTimingParameter            | ❌ |    |    | Withdrawn in ISO 14229-1:2020 |

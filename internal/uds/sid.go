@@ -20,6 +20,7 @@ const (
 	SIDRequestUpload                   byte = 0x35
 	SIDTransferData                    byte = 0x36
 	SIDRequestTransferExit             byte = 0x37
+	SIDRequestFileTransfer             byte = 0x38
 	SIDWriteMemoryByAddress            byte = 0x3D
 	SIDTesterPresent                   byte = 0x3E
 	SIDResponseOnEvent                 byte = 0x86

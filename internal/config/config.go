@@ -57,8 +57,12 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 	// File paths in the configuration are relative to the configuration file.
+	dir := filepath.Dir(path)
 	if cfg.ECU.Memory != nil {
-		cfg.ECU.Memory.resolvePaths(filepath.Dir(path))
+		cfg.ECU.Memory.resolvePaths(dir)
+	}
+	if ft := cfg.ECU.Services.RequestFileTransfer; ft != nil && ft.Root != "" && !filepath.IsAbs(ft.Root) {
+		ft.Root = filepath.Join(dir, ft.Root)
 	}
 	return cfg, nil
 }

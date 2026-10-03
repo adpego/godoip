@@ -1,10 +1,11 @@
-// Package transfer implements the data transfer services on top of the ECU
-// memory: RequestDownload (0x34), RequestUpload (0x35), TransferData (0x36)
-// and RequestTransferExit (0x37).
+// Package transfer implements the data transfer services: RequestDownload
+// (0x34) and RequestUpload (0x35) on the ECU memory, RequestFileTransfer
+// (0x38) on a sandboxed directory, and the shared TransferData (0x36) and
+// RequestTransferExit (0x37).
 //
-// Downloaded data is buffered and only written to memory (and persisted to
-// the memory output file) by a successful RequestTransferExit, so an aborted
-// transfer leaves the memory untouched.
+// Downloaded data is buffered and only committed (written to memory and
+// persisted, or written to the file) by a successful RequestTransferExit, so
+// an aborted transfer changes nothing.
 package transfer
 
 import (
@@ -29,12 +30,12 @@ const (
 // session is the active transfer, if any.
 type session struct {
 	dir         direction
-	addr        uint32
 	size        uint32
-	data        []byte // download: received data; upload: data to send
-	offset      uint32 // bytes transferred
-	counter     uint8  // last accepted blockSequenceCounter
-	lastLen     int    // length of the last accepted download block (repeat detection)
+	data        []byte                 // download: received data; upload: data to send
+	commit      func(data []byte) bool // download: applies the data on exit
+	offset      uint32                 // bytes transferred
+	counter     uint8                  // last accepted blockSequenceCounter
+	lastLen     int                    // length of the last accepted download block (repeat detection)
 	maxBlockLen uint32
 }
 
@@ -42,6 +43,7 @@ type session struct {
 // locked. Any session change or reset aborts the active transfer.
 type Transfer struct {
 	mem    *memory.Memory
+	files  *fileService
 	active session
 }
 
@@ -64,16 +66,17 @@ func newRequestConfig(c *config.TransferService) (requestConfig, error) {
 	return rc, nil
 }
 
-// Services groups the configuration of the four transfer services.
+// Services groups the configuration of the transfer services.
 type Services struct {
 	Download *config.TransferService
 	Upload   *config.TransferService
+	File     *config.FileTransferService
 	Data     *config.Service
 	Exit     *config.Service
 }
 
 func (s Services) enabled() bool {
-	return s.Download != nil || s.Upload != nil || s.Data != nil || s.Exit != nil
+	return s.Download != nil || s.Upload != nil || s.File != nil || s.Data != nil || s.Exit != nil
 }
 
 // Register adds the enabled transfer services to e.
@@ -81,10 +84,22 @@ func Register(e *uds.ECU, cfg Services, mem *memory.Memory) (*Transfer, error) {
 	if !cfg.enabled() {
 		return nil, nil
 	}
-	if mem == nil {
-		return nil, fmt.Errorf("requires an ecu.memory configuration")
+	if mem == nil && (cfg.Download != nil || cfg.Upload != nil) {
+		return nil, fmt.Errorf("request_download/request_upload require an ecu.memory configuration")
 	}
 	t := &Transfer{mem: mem}
+	if cfg.File != nil {
+		fs, err := newFileService(cfg.File)
+		if err != nil {
+			return nil, fmt.Errorf("request_file_transfer: %w", err)
+		}
+		t.files = fs
+		if err := e.Register(uds.Service{
+			SID: uds.SIDRequestFileTransfer, Config: cfg.File.Service, MinLength: 4, Handle: t.fileTransfer,
+		}); err != nil {
+			return nil, err
+		}
+	}
 	e.OnSessionChange(func(_, _ uint8) { t.active = session{} })
 
 	if cfg.Download != nil {
@@ -164,16 +179,30 @@ func (t *Transfer) request(c *uds.Context, req uds.Request, dir direction, rc re
 		return uds.NegativeResponse(req.SID, nrc)
 	}
 
-	t.active = session{dir: dir, addr: a.Addr, size: a.Size, maxBlockLen: rc.maxBlockLen}
 	if dir == upload {
-		t.active.data = t.mem.Read(a.Addr, a.Size)
+		t.startUpload(t.mem.Read(a.Addr, a.Size), rc.maxBlockLen)
 	} else {
-		t.active.data = make([]byte, 0, a.Size)
+		addr, mem := a.Addr, t.mem
+		t.startDownload(a.Size, rc.maxBlockLen, func(data []byte) bool {
+			mem.Write(addr, data)
+			return mem.Flush() == nil
+		})
 	}
+	return uds.PositiveResponse(req.SID, maxBlockLength(rc.maxBlockLen)...)
+}
 
-	// lengthFormatIdentifier: number of bytes of maxNumberOfBlockLength in the high nibble.
-	return uds.PositiveResponse(req.SID, 0x40,
-		byte(rc.maxBlockLen>>24), byte(rc.maxBlockLen>>16), byte(rc.maxBlockLen>>8), byte(rc.maxBlockLen))
+func (t *Transfer) startUpload(data []byte, maxBlockLen uint32) {
+	t.active = session{dir: upload, size: uint32(len(data)), data: data, maxBlockLen: maxBlockLen}
+}
+
+func (t *Transfer) startDownload(size, maxBlockLen uint32, commit func([]byte) bool) {
+	t.active = session{dir: download, size: size, data: make([]byte, 0, size), commit: commit, maxBlockLen: maxBlockLen}
+}
+
+// maxBlockLength encodes lengthFormatIdentifier (number of bytes of
+// maxNumberOfBlockLength in the high nibble) and maxNumberOfBlockLength.
+func maxBlockLength(n uint32) []byte {
+	return []byte{0x40, byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
 }
 
 // transferData handles TransferData.
@@ -230,11 +259,8 @@ func (t *Transfer) exit(_ *uds.Context, req uds.Request) []byte {
 		return uds.NegativeResponse(req.SID, uds.NRCRequestSequenceError)
 	}
 	t.active = session{}
-	if s.dir == download {
-		t.mem.Write(s.addr, s.data)
-		if err := t.mem.Flush(); err != nil {
-			return uds.NegativeResponse(req.SID, uds.NRCProgrammingFailure)
-		}
+	if s.dir == download && !s.commit(s.data) {
+		return uds.NegativeResponse(req.SID, uds.NRCProgrammingFailure)
 	}
 	return uds.PositiveResponse(req.SID)
 }

@@ -76,6 +76,9 @@ ecu:
       max_block_length: 34
     request_upload:
       max_block_length: 34
+    request_file_transfer:
+      root: files
+      max_block_length: 34
     transfer_data: {}
     request_transfer_exit: {}
 

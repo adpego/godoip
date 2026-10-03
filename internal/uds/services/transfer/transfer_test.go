@@ -130,8 +130,14 @@ func TestCounterWraps(t *testing.T) {
 
 func TestRegisterErrors(t *testing.T) {
 	e, _ := udstest.New(t)
-	if _, err := transfer.Register(e, transfer.Services{Data: &config.Service{}}, nil); err == nil {
+	if _, err := transfer.Register(e, transfer.Services{Download: &config.TransferService{}}, nil); err == nil {
 		t.Error("expected error without memory")
+	}
+	if _, err := transfer.Register(e, transfer.Services{File: &config.FileTransferService{}}, nil); err == nil {
+		t.Error("expected error without root")
+	}
+	if _, err := transfer.Register(e, transfer.Services{File: &config.FileTransferService{Root: t.TempDir(), Modes: []uint8{0x06}}}, nil); err == nil {
+		t.Error("expected error for unsupported mode")
 	}
 	mem, _ := memory.New(&config.Memory{})
 	if _, err := transfer.Register(e, transfer.Services{Download: &config.TransferService{MaxBlockLength: 2}}, mem); err == nil {

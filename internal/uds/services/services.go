@@ -84,6 +84,7 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 			_, err := transfer.Register(e, transfer.Services{
 				Download: svc.RequestDownload,
 				Upload:   svc.RequestUpload,
+				File:     svc.RequestFileTransfer,
 				Data:     svc.TransferData,
 				Exit:     svc.RequestTransferExit,
 			}, mem)
