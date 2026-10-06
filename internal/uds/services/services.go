@@ -11,6 +11,7 @@ import (
 
 	"github.com/adpego/godoip/internal/config"
 	"github.com/adpego/godoip/internal/uds"
+	"github.com/adpego/godoip/internal/uds/services/auth"
 	"github.com/adpego/godoip/internal/uds/services/commcontrol"
 	"github.com/adpego/godoip/internal/uds/services/dddi"
 	"github.com/adpego/godoip/internal/uds/services/did"
@@ -57,6 +58,7 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 		{"diagnostic_session_control", func() error { return session.Register(e, svc.DiagnosticSessionControl) }},
 		{"ecu_reset", func() error { return ecureset.Register(e, svc.ECUReset) }},
 		{"security_access", func() error { return security.Register(e, svc.SecurityAccess) }},
+		{"authentication", func() error { return auth.Register(e, svc.Authentication) }},
 		{"tester_present", func() error { return testerpresent.Register(e, svc.TesterPresent) }},
 		{"read_data_by_identifier", func() error { return did.RegisterRead(e, svc.ReadDataByIdentifier, dids) }},
 		{"write_data_by_identifier", func() error { return did.RegisterWrite(e, svc.WriteDataByIdentifier, dids) }},

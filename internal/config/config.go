@@ -61,8 +61,15 @@ func Load(path string) (*Config, error) {
 	if cfg.ECU.Memory != nil {
 		cfg.ECU.Memory.resolvePaths(dir)
 	}
-	if ft := cfg.ECU.Services.RequestFileTransfer; ft != nil && ft.Root != "" && !filepath.IsAbs(ft.Root) {
-		ft.Root = filepath.Join(dir, ft.Root)
+	if ft := cfg.ECU.Services.RequestFileTransfer; ft != nil {
+		resolve(dir, &ft.Root)
+	}
+	if a := cfg.ECU.Services.Authentication; a != nil {
+		for i := range a.CACertificates {
+			resolve(dir, &a.CACertificates[i])
+		}
+		resolve(dir, &a.ServerCertificate)
+		resolve(dir, &a.ServerKey)
 	}
 	return cfg, nil
 }
@@ -74,4 +81,11 @@ func Parse(data []byte) (*Config, error) {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+// resolve makes a relative path relative to dir.
+func resolve(dir string, p *string) {
+	if *p != "" && !filepath.IsAbs(*p) {
+		*p = filepath.Join(dir, *p)
+	}
 }

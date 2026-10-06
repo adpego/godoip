@@ -48,6 +48,14 @@ ecu:
 
     tester_present: {}
 
+    # APCE with the test PKI in pki/, ACR with a shared secret.
+    authentication:
+      security_level: 0x7F
+      ca_certificates: [pki/ca.pem]
+      server_certificate: pki/ecu.pem
+      server_key: pki/ecu.key
+      secret: "00 11 22 33 44 55 66 77"
+
     read_data_by_identifier: {}
 
     write_data_by_identifier: {}
@@ -101,6 +109,10 @@ ecu:
   dids:
     - id: 0xF190
       ascii: "WBA12345678901234"
+    - id: 0xF18A
+      ascii: "AUTH-ONLY"
+      read:
+        security_levels: [0x7F]
     - id: 0xF189
       hex: "01 02 03"
       scaling: {hex: "41 02"}

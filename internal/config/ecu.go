@@ -60,6 +60,22 @@ type Services struct {
 	ReadDataByPeriodicID     *PeriodicService       `yaml:"read_data_by_periodic_identifier"`
 	ResponseOnEvent          *ROEService            `yaml:"response_on_event"`
 	RequestFileTransfer      *FileTransferService   `yaml:"request_file_transfer"`
+	Authentication           *AuthService           `yaml:"authentication"`
+}
+
+// AuthService configures Authentication (0x29). APCE (certificate based) is
+// enabled by ca_certificates, ACR (symmetric challenge-response) by secret.
+// A successful authentication unlocks SecurityLevel, so it can be used in
+// every access block; like SecurityAccess it is lost on session changes.
+type AuthService struct {
+	Service           `yaml:",inline"`
+	SubFunctions      []SubFunction `yaml:"sub_functions"`      // empty = every implemented one
+	SecurityLevel     uint8         `yaml:"security_level"`     // level granted when authenticated; defaults to 0x7F
+	ChallengeLength   int           `yaml:"challenge_length"`   // server challenge size; defaults to 32
+	CACertificates    []string      `yaml:"ca_certificates"`    // PEM files trusted for client certificates (APCE)
+	ServerCertificate string        `yaml:"server_certificate"` // PEM certificate for bidirectional APCE
+	ServerKey         string        `yaml:"server_key"`         // PEM private key for bidirectional APCE
+	Secret            string        `yaml:"secret"`             // hex HMAC-SHA256 key (ACR)
 }
 
 // FileTransferService configures RequestFileTransfer (0x38). Every path is

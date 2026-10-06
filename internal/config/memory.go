@@ -1,7 +1,5 @@
 package config
 
-import "path/filepath"
-
 // Memory describes the ECU memory, backed by a firmware file. The input file
 // is never modified: writes are applied in memory and persisted to OutputFile.
 type Memory struct {
@@ -32,9 +30,6 @@ type ReadMemoryService struct {
 
 // resolvePaths makes relative file paths relative to dir.
 func (m *Memory) resolvePaths(dir string) {
-	for _, p := range []*string{&m.File, &m.OutputFile} {
-		if *p != "" && !filepath.IsAbs(*p) {
-			*p = filepath.Join(dir, *p)
-		}
-	}
+	resolve(dir, &m.File)
+	resolve(dir, &m.OutputFile)
 }

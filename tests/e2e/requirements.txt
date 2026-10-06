@@ -1,3 +1,4 @@
 doipclient>=1.2
 udsoncan>=1.26
 pytest>=8
+cryptography>=42

@@ -59,6 +59,7 @@ class ServerProcess:
         for name in SERVER_FILES:
             shutil.copy(E2E_DIR / name, workdir / name)
         shutil.copytree(E2E_DIR / "files", workdir / "files")
+        shutil.copytree(E2E_DIR / "pki", workdir / "pki")
         config = workdir / "config.yaml"
         text = config.read_text()
         for old, new in (replacements or {}).items():

@@ -12,6 +12,7 @@ const (
 	SIDDynamicallyDefineDataIdentifier byte = 0x2C
 	SIDReadMemoryByAddress             byte = 0x23
 	SIDSecurityAccess                  byte = 0x27
+	SIDAuthentication                  byte = 0x29
 	SIDCommunicationControl            byte = 0x28
 	SIDWriteDataByIdentifier           byte = 0x2E
 	SIDInputOutputControlByIdentifier  byte = 0x2F
