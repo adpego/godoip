@@ -51,7 +51,7 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | 0x3D | WriteMemoryByAddress             | ✅ | ✅ | ✅ | Persisted to a separate output file, the input file is never modified |
 | 0x3E | TesterPresent                    | ✅ | ✅ | ✅ | |
 | 0x83 | AccessTimingParameter            | ❌ |    |    | Withdrawn in ISO 14229-1:2020 |
-| 0x84 | SecuredDataTransmission          | ❌ |    |    | |
+| 0x84 | SecuredDataTransmission          | ⚠️ | ✅ | ✅ | ISO 14229-1:2020 layout, HMAC-SHA256 signatures and anti-replay; no encryption |
 | 0x85 | ControlDTCSetting                | ✅ | ✅ | ✅ | Blocks DTC status updates, re-enabled in default session |
 | 0x86 | ResponseOnEvent                  | ⚠️ | ✅ | ✅ | Events 0x00–0x06 (DTC status, timer, DID change); onComparisonOfValues not implemented |
 | 0x87 | LinkControl                      | ✅ | ✅ | ✅ | Fixed/specific baudrate verification and transition |
@@ -124,7 +124,7 @@ internal/uds/               UDS core: ECU, dispatcher, session/security state, a
 internal/uds/udstest/       test helpers for services
 internal/uds/services/      one package per service + services.New wiring them all
   session/ ecureset/ security/ testerpresent/ did/ dtc/ memory/ routine/
-  iocontrol/ commcontrol/ linkcontrol/ transfer/ dddi/ periodic/ roe/ auth/
+  iocontrol/ commcontrol/ linkcontrol/ transfer/ dddi/ periodic/ roe/ auth/ sdt/
 tests/e2e/                  pytest suite using doipclient + udsoncan
 firmware/                   sample firmware for config.yaml
 ```

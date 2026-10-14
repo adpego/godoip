@@ -23,6 +23,7 @@ import (
 	"github.com/adpego/godoip/internal/uds/services/periodic"
 	"github.com/adpego/godoip/internal/uds/services/roe"
 	"github.com/adpego/godoip/internal/uds/services/routine"
+	"github.com/adpego/godoip/internal/uds/services/sdt"
 	"github.com/adpego/godoip/internal/uds/services/security"
 	"github.com/adpego/godoip/internal/uds/services/session"
 	"github.com/adpego/godoip/internal/uds/services/testerpresent"
@@ -59,6 +60,7 @@ func New(cfg config.ECU, opts ...uds.Option) (*uds.ECU, error) {
 		{"ecu_reset", func() error { return ecureset.Register(e, svc.ECUReset) }},
 		{"security_access", func() error { return security.Register(e, svc.SecurityAccess) }},
 		{"authentication", func() error { return auth.Register(e, svc.Authentication) }},
+		{"secured_data_transmission", func() error { return sdt.Register(e, svc.SecuredDataTransmission) }},
 		{"tester_present", func() error { return testerpresent.Register(e, svc.TesterPresent) }},
 		{"read_data_by_identifier", func() error { return did.RegisterRead(e, svc.ReadDataByIdentifier, dids) }},
 		{"write_data_by_identifier", func() error { return did.RegisterWrite(e, svc.WriteDataByIdentifier, dids) }},

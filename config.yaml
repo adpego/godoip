@@ -70,6 +70,14 @@ ecu:
     #   server_key: pki/ecu.key
     #   secret: "00 11 22 33 44 55 66 77"
 
+    # Simplified SecuredDataTransmission: HMAC-SHA256 signatures, no
+    # encryption, anti-replay counter. The internal request goes through the
+    # normal service checks.
+    secured_data_transmission:
+      secret: "C0 FF EE"
+      require_signature: false
+      anti_replay: true
+
     ecu_reset:
       reset_types:
         - id: 0x01          # hardReset

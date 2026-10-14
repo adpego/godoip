@@ -18,6 +18,11 @@ const (
 	NRCExceededNumberOfAttempts      byte = 0x36
 	NRCRequiredTimeDelayNotExpired   byte = 0x37
 
+	// SecuredDataTransmission (ISO 15764)
+	NRCGeneralSecurityViolation byte = 0x38
+	NRCSecuredModeRequested     byte = 0x39
+	NRCInsufficientProtection   byte = 0x3A
+
 	// Authentication (ISO 14229-1:2020)
 	NRCCertificateInvalidTimePeriod   byte = 0x50
 	NRCCertificateInvalidSignature    byte = 0x51

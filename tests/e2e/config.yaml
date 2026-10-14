@@ -48,6 +48,9 @@ ecu:
 
     tester_present: {}
 
+    secured_data_transmission:
+      secret: "C0 FF EE"
+
     # APCE with the test PKI in pki/, ACR with a shared secret.
     authentication:
       security_level: 0x7F

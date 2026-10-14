@@ -61,6 +61,16 @@ type Services struct {
 	ResponseOnEvent          *ROEService            `yaml:"response_on_event"`
 	RequestFileTransfer      *FileTransferService   `yaml:"request_file_transfer"`
 	Authentication           *AuthService           `yaml:"authentication"`
+	SecuredDataTransmission  *SDTService            `yaml:"secured_data_transmission"`
+}
+
+// SDTService configures SecuredDataTransmission (0x84). Signed messages use
+// HMAC-SHA256 with Secret; encryption is not supported.
+type SDTService struct {
+	Service          `yaml:",inline"`
+	Secret           string `yaml:"secret"`            // hex HMAC-SHA256 key; empty = signatures not supported
+	RequireSignature bool   `yaml:"require_signature"` // reject unsigned requests
+	AntiReplay       *bool  `yaml:"anti_replay"`       // anti-replay counter must increase; defaults to true
 }
 
 // AuthService configures Authentication (0x29). APCE (certificate based) is
