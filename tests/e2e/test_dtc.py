@@ -55,3 +55,9 @@ def test_dtc_setting_blocks_routine_effect(client, uds):
     client.start_routine(0x0300)
     resp = client.get_dtc_by_status_mask(0x01)
     assert 0x030000 in codes(resp.service_data.dtcs)
+
+
+def test_dtc_by_severity(client):
+    resp = client.get_dtc_by_status_severity_mask(status_mask=0xFF, severity_mask=0x80)
+    assert [d.id for d in resp.service_data.dtcs] == [0x010100]
+    assert resp.service_data.dtcs[0].severity.check_immediately

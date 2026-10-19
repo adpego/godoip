@@ -23,6 +23,8 @@ type DTC struct {
 	Status                uint8
 	FaultDetectionCounter int8
 	Permanent             bool
+	Severity              uint8
+	FunctionalUnit        uint8
 	snapshots             []record
 	extendedData          []record
 }
@@ -43,7 +45,10 @@ func newDTC(c config.DTC) (*DTC, error) {
 	if c.Code > maxCode {
 		return nil, fmt.Errorf("DTC 0x%X does not fit in 3 bytes", c.Code)
 	}
-	d := &DTC{Code: c.Code, Status: c.Status, FaultDetectionCounter: c.FaultDetectionCounter, Permanent: c.Permanent}
+	d := &DTC{
+		Code: c.Code, Status: c.Status, FaultDetectionCounter: c.FaultDetectionCounter,
+		Permanent: c.Permanent, Severity: c.Severity, FunctionalUnit: c.FunctionalUnit,
+	}
 
 	seen := map[uint8]bool{}
 	for _, s := range c.Snapshots {

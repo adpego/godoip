@@ -350,6 +350,8 @@ ecu:
     - code: 0x010100               # P0101
       name: Mass air flow circuit range
       status: 0x2F
+      severity: 0x40               # checkAtNextHalt
+      functional_unit: 0x10
       fault_detection_counter: 0x7F
       snapshots:
         - record: 0x01

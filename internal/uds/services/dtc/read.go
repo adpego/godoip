@@ -10,18 +10,23 @@ import (
 
 // ReadDTCInformation report types (ISO 14229-1).
 const (
-	ReportNumberOfDTCByStatusMask      uint8 = 0x01
-	ReportDTCByStatusMask              uint8 = 0x02
-	ReportDTCSnapshotIdentification    uint8 = 0x03
-	ReportDTCSnapshotRecordByDTCNumber uint8 = 0x04
-	ReportDTCExtDataRecordByDTCNumber  uint8 = 0x06
-	ReportSupportedDTC                 uint8 = 0x0A
-	ReportFirstTestFailedDTC           uint8 = 0x0B
-	ReportFirstConfirmedDTC            uint8 = 0x0C
-	ReportMostRecentTestFailedDTC      uint8 = 0x0D
-	ReportMostRecentConfirmedDTC       uint8 = 0x0E
-	ReportDTCFaultDetectionCounter     uint8 = 0x14
-	ReportDTCWithPermanentStatus       uint8 = 0x15
+	ReportNumberOfDTCByStatusMask         uint8 = 0x01
+	ReportDTCByStatusMask                 uint8 = 0x02
+	ReportDTCSnapshotIdentification       uint8 = 0x03
+	ReportDTCSnapshotRecordByDTCNumber    uint8 = 0x04
+	ReportDTCExtDataRecordByDTCNumber     uint8 = 0x06
+	ReportNumberOfDTCBySeverityMaskRecord uint8 = 0x07
+	ReportDTCBySeverityMaskRecord         uint8 = 0x08
+	ReportSeverityInformationOfDTC        uint8 = 0x09
+	ReportSupportedDTC                    uint8 = 0x0A
+	ReportFirstTestFailedDTC              uint8 = 0x0B
+	ReportFirstConfirmedDTC               uint8 = 0x0C
+	ReportMostRecentTestFailedDTC         uint8 = 0x0D
+	ReportMostRecentConfirmedDTC          uint8 = 0x0E
+	ReportDTCFaultDetectionCounter        uint8 = 0x14
+	ReportDTCWithPermanentStatus          uint8 = 0x15
+	ReportDTCExtDataRecordByRecordNumber  uint8 = 0x16
+	ReportSupportedDTCExtDataRecord       uint8 = 0x1A
 )
 
 const (
@@ -49,18 +54,23 @@ var reports = map[uint8]struct {
 	length int // exact request length, SID included
 	handle reportHandler
 }{
-	ReportNumberOfDTCByStatusMask:      {3, (*reader).numberByStatusMask},
-	ReportDTCByStatusMask:              {3, (*reader).byStatusMask},
-	ReportDTCSnapshotIdentification:    {2, (*reader).snapshotIdentification},
-	ReportDTCSnapshotRecordByDTCNumber: {6, (*reader).snapshotRecord},
-	ReportDTCExtDataRecordByDTCNumber:  {6, (*reader).extendedDataRecord},
-	ReportSupportedDTC:                 {2, (*reader).supported},
-	ReportFirstTestFailedDTC:           {2, chronological(statusTestFailed, false)},
-	ReportFirstConfirmedDTC:            {2, chronological(statusConfirmedDTC, false)},
-	ReportMostRecentTestFailedDTC:      {2, chronological(statusTestFailed, true)},
-	ReportMostRecentConfirmedDTC:       {2, chronological(statusConfirmedDTC, true)},
-	ReportDTCFaultDetectionCounter:     {2, (*reader).faultDetectionCounter},
-	ReportDTCWithPermanentStatus:       {2, (*reader).permanent},
+	ReportNumberOfDTCByStatusMask:         {3, (*reader).numberByStatusMask},
+	ReportDTCByStatusMask:                 {3, (*reader).byStatusMask},
+	ReportDTCSnapshotIdentification:       {2, (*reader).snapshotIdentification},
+	ReportDTCSnapshotRecordByDTCNumber:    {6, (*reader).snapshotRecord},
+	ReportDTCExtDataRecordByDTCNumber:     {6, (*reader).extendedDataRecord},
+	ReportSupportedDTC:                    {2, (*reader).supported},
+	ReportFirstTestFailedDTC:              {2, chronological(statusTestFailed, false)},
+	ReportFirstConfirmedDTC:               {2, chronological(statusConfirmedDTC, false)},
+	ReportMostRecentTestFailedDTC:         {2, chronological(statusTestFailed, true)},
+	ReportMostRecentConfirmedDTC:          {2, chronological(statusConfirmedDTC, true)},
+	ReportDTCFaultDetectionCounter:        {2, (*reader).faultDetectionCounter},
+	ReportDTCWithPermanentStatus:          {2, (*reader).permanent},
+	ReportNumberOfDTCBySeverityMaskRecord: {4, (*reader).numberBySeverity},
+	ReportDTCBySeverityMaskRecord:         {4, (*reader).bySeverity},
+	ReportSeverityInformationOfDTC:        {5, (*reader).severityOfDTC},
+	ReportDTCExtDataRecordByRecordNumber:  {3, (*reader).extDataByRecordNumber},
+	ReportSupportedDTCExtDataRecord:       {3, (*reader).supportedExtDataRecord},
 }
 
 // RegisterRead adds ReadDTCInformation (0x19) to e. A nil cfg disables it.
@@ -241,6 +251,84 @@ func (r *reader) extendedDataRecord(req uds.Request) ([]byte, byte) {
 	}
 	if !found && number != allRecords && number != allOBDExtendedDataRecords {
 		return nil, uds.NRCRequestOutOfRange
+	}
+	return out, 0
+}
+
+// matchingSeverity returns the DTCs matching both masks (request bytes 2-3).
+func (r *reader) matchingSeverity(req uds.Request) []*DTC {
+	sevMask, statusMask := req.Data[2], req.Data[3]
+	var out []*DTC
+	for _, d := range r.store.All() {
+		if d.Severity&sevMask != 0 && r.status(d)&statusMask != 0 {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// severityRecords encodes [severity functionalUnit DTC status]...
+func (r *reader) severityRecords(dtcs []*DTC) []byte {
+	out := []byte{r.availability}
+	for _, d := range dtcs {
+		out = append(out, d.Severity, d.FunctionalUnit)
+		out = append(out, d.codeBytes()...)
+		out = append(out, r.status(d))
+	}
+	return out
+}
+
+func (r *reader) numberBySeverity(req uds.Request) ([]byte, byte) {
+	n := len(r.matchingSeverity(req))
+	return []byte{r.availability, r.format, byte(n >> 8), byte(n)}, 0
+}
+
+func (r *reader) bySeverity(req uds.Request) ([]byte, byte) {
+	return r.severityRecords(r.matchingSeverity(req)), 0
+}
+
+func (r *reader) severityOfDTC(req uds.Request) ([]byte, byte) {
+	code := uint32(req.Data[2])<<16 | uint32(req.Data[3])<<8 | uint32(req.Data[4])
+	d := r.store.Get(code)
+	if d == nil {
+		return nil, uds.NRCRequestOutOfRange
+	}
+	return r.severityRecords([]*DTC{d}), 0
+}
+
+// extDataByRecordNumber reports every DTC having extended data record N.
+func (r *reader) extDataByRecordNumber(req uds.Request) ([]byte, byte) {
+	number := req.Data[2]
+	if number >= 0xF0 {
+		return nil, uds.NRCRequestOutOfRange
+	}
+	out := []byte{number}
+	for _, d := range r.store.All() {
+		for _, x := range d.extendedData {
+			if x.number == number {
+				out = append(out, d.codeBytes()...)
+				out = append(out, r.status(d))
+				out = append(out, x.data...)
+			}
+		}
+	}
+	return out, 0
+}
+
+// supportedExtDataRecord lists the DTCs supporting extended data record N.
+func (r *reader) supportedExtDataRecord(req uds.Request) ([]byte, byte) {
+	number := req.Data[2]
+	if number == 0x00 || number >= 0xFE {
+		return nil, uds.NRCRequestOutOfRange
+	}
+	out := []byte{r.availability, number}
+	for _, d := range r.store.All() {
+		for _, x := range d.extendedData {
+			if x.number == number {
+				out = append(out, d.codeBytes()...)
+				out = append(out, r.status(d))
+			}
+		}
 	}
 	return out, 0
 }

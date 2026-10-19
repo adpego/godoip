@@ -8,6 +8,8 @@ type DTC struct {
 	Status                uint8             `yaml:"status"`                  // statusOfDTC bits (ISO 14229-1 D.2)
 	FaultDetectionCounter int8              `yaml:"fault_detection_counter"` // -128..127
 	Permanent             bool              `yaml:"permanent"`
+	Severity              uint8             `yaml:"severity"`        // DTCSeverity: 0x20 maintenanceOnly, 0x40 checkAtNextHalt, 0x80 checkImmediately
+	FunctionalUnit        uint8             `yaml:"functional_unit"` // DTCFunctionalUnit
 	Snapshots             []DTCSnapshot     `yaml:"snapshots"`
 	ExtendedData          []DTCExtendedData `yaml:"extended_data"`
 }

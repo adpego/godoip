@@ -31,7 +31,7 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | 0x10 | DiagnosticSessionControl         | ✅ | ✅ | ✅ | Custom sessions, P2/P2* timings, allowed transitions, S3 timeout |
 | 0x11 | ECUReset                         | ✅ | ✅ | ✅ | Configurable reset types, rapid power shutdown (0x04/0x05) |
 | 0x14 | ClearDiagnosticInformation       | ✅ | ✅ | ✅ | All, single DTC, user-defined groups |
-| 0x19 | ReadDTCInformation               | ⚠️ | ✅ | ✅ | Report types 0x01–0x04, 0x06, 0x0A–0x0E, 0x14, 0x15 |
+| 0x19 | ReadDTCInformation               | ⚠️ | ✅ | ✅ | 0x01–0x04, 0x06–0x0E, 0x14–0x16, 0x1A; mirror/user memory and OBD reports missing |
 | 0x22 | ReadDataByIdentifier             | ✅ | ✅ | ✅ | Multiple DIDs per request, per-DID access |
 | 0x23 | ReadMemoryByAddress              | ✅ | ✅ | ✅ | Backed by S-Record / Intel HEX / binary file, per-region access |
 | 0x24 | ReadScalingDataByIdentifier      | ✅ | ✅ | ✅ | Per-DID scaling record, DID read access applies |

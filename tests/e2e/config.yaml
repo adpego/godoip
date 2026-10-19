@@ -139,6 +139,7 @@ ecu:
   dtcs:
     - code: 0x010100
       status: 0x09
+      severity: 0x80
       snapshots:
         - record: 0x01
           dids:
