@@ -78,7 +78,7 @@ and [`udsoncan`](https://github.com/pylessard/python-udsoncan) (`tests/e2e`).
 | DoIP entity status (0x4001/0x4002)                           | ✅ | ✅ | ✅ | Node type, max/open sockets, max data size |
 | Diagnostic power mode (0x4003/0x4004)                        | ✅ | ✅ | ✅ | Configurable mode |
 | Routing activation (0x0005/0x0006)                           | ✅ | ✅ | ✅ | Client address range, activation types, SA checks, max sockets |
-| Alive check (0x0007/0x0008)                                  | ⚠️ | ✅ | ✅ | Answers client requests; the server never initiates alive checks |
+| Alive check (0x0007/0x0008)                                  | ✅ | ✅ | ✅ | Answers client checks; checks busy sockets on activation and frees dead ones |
 | Diagnostic message + positive/negative ACK (0x8001-0x8003)   | ✅ | ✅ | ✅ | Physical and functional addressing |
 | Generic header NACK (0x0000)                                 | ✅ | ✅ | ✅ | Pattern, unknown type, too large, invalid length (TCP and UDP) |
 | Initial / general inactivity timers                          | ✅ | ✅ |    | |

@@ -57,6 +57,7 @@ func newTCPServer(t *testing.T, entity *Entity) *TCPServer {
 		ClientAddrMin:     0x0E00,
 		ClientAddrMax:     0x0E0F,
 		InitialInactivity: 200 * time.Millisecond,
+		AliveCheckTimeout: 100 * time.Millisecond,
 	}, entity, ecu)
 }
 
@@ -205,28 +206,74 @@ func TestRoutingActivationSAMismatch(t *testing.T) {
 	expectClosed(t, c)
 }
 
-func TestRoutingActivationAlreadyActiveAndNoFreeSockets(t *testing.T) {
-	s := newTCPServer(t, testEntity()) // max 2 sockets
+// answerAliveChecks makes c answer every alive check request with addr.
+func answerAliveChecks(t *testing.T, c net.Conn, addr uint16) {
+	go func() {
+		for {
+			hdr, err := doip.ReadHeader(c)
+			if err != nil {
+				return
+			}
+			io.CopyN(io.Discard, c, int64(hdr.PayloadLen))
+			if hdr.PayloadType == doip.AliveCheckReq {
+				c.Write(doip.BuildAliveCheckResponse(version, addr))
+			}
+		}
+	}()
+}
+
+func TestAlreadyActiveAliveClientKeepsAddress(t *testing.T) {
+	s := newTCPServer(t, testEntity())
 	c1 := dial(t, s)
 	activate(t, c1, clientAddr)
+	answerAliveChecks(t, c1, clientAddr)
 
 	c2 := dial(t, s)
 	send(t, c2, doip.RoutingActivationReq, activation(clientAddr, 0x00))
 	expect(t, c2, doip.BuildRoutingActivationResponse(version, clientAddr, ecuAddr, doip.ActivationDeniedSAAlreadyActive))
 	expectClosed(t, c2)
+}
+
+func TestAlreadyActiveDeadClientIsReplaced(t *testing.T) {
+	s := newTCPServer(t, testEntity())
+	c1 := dial(t, s)
+	activate(t, c1, clientAddr) // c1 never answers alive checks
+
+	c2 := dial(t, s)
+	activate(t, c2, clientAddr)
+	expect(t, c1, doip.BuildAliveCheckRequest(version))
+	expectClosed(t, c1)
+}
+
+func TestNoFreeSocketsAliveCheck(t *testing.T) {
+	s := newTCPServer(t, testEntity()) // max 2 sockets
+	c1 := dial(t, s)
+	activate(t, c1, clientAddr)
+	answerAliveChecks(t, c1, clientAddr)
+	c2 := dial(t, s)
+	activate(t, c2, clientAddr+1)
+	answerAliveChecks(t, c2, clientAddr+1)
+
+	// Both sockets answer: no slot is freed.
+	c3 := dial(t, s)
+	send(t, c3, doip.RoutingActivationReq, activation(clientAddr+2, 0x00))
+	expect(t, c3, doip.BuildRoutingActivationResponse(version, clientAddr+2, ecuAddr, doip.ActivationDeniedNoFreeSockets))
+	expectClosed(t, c3)
+
+}
+
+func TestNoFreeSocketsDeadClientLosesSlot(t *testing.T) {
+	s := newTCPServer(t, testEntity()) // max 2 sockets
+	c1 := dial(t, s)
+	activate(t, c1, clientAddr)
+	answerAliveChecks(t, c1, clientAddr)
+	c2 := dial(t, s)
+	activate(t, c2, clientAddr+1) // open but never answers
 
 	c3 := dial(t, s)
-	activate(t, c3, clientAddr+1)
-	c4 := dial(t, s)
-	send(t, c4, doip.RoutingActivationReq, activation(clientAddr+2, 0x00))
-	expect(t, c4, doip.BuildRoutingActivationResponse(version, clientAddr+2, ecuAddr, doip.ActivationDeniedNoFreeSockets))
-	expectClosed(t, c4)
-
-	// Closing a socket frees its address.
-	c1.Close()
-	time.Sleep(50 * time.Millisecond)
-	c5 := dial(t, s)
-	activate(t, c5, clientAddr)
+	activate(t, c3, clientAddr+2)
+	expect(t, c2, doip.BuildAliveCheckRequest(version))
+	expectClosed(t, c2)
 }
 
 func TestDiagnosticBeforeActivationClosesSocket(t *testing.T) {

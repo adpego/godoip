@@ -139,6 +139,7 @@ func buildTCPConfig(cfg *config.Config) transport.TCPConfig {
 		ActivationTypes:   s.ActivationTypes,
 		InitialInactivity: time.Duration(s.InitialInactivity) * time.Millisecond,
 		GeneralInactivity: time.Duration(s.GeneralInactivity) * time.Millisecond,
+		AliveCheckTimeout: time.Duration(s.AliveCheckTimeout) * time.Millisecond,
 	}
 }
 

@@ -121,3 +121,28 @@ def test_no_announcement_when_disabled(start_server):
         data = None
     listener.close()
     assert data is None
+
+
+def _activate(s, addr):
+    s.sendall(_header(0x0005, 7) + struct.pack(">HB4x", addr, 0x00))
+    return s.recv(64)[12]
+
+
+def test_alive_check_replaces_dead_socket(server):
+    dead = _raw_tcp()
+    assert _activate(dead, 0x0E00) == 0x10
+    with _raw_tcp() as s:
+        assert _activate(s, 0x0E00) == 0x10  # dead socket did not answer the alive check
+    assert dead.recv(64) == _header(0x0007, 0)
+    dead.close()
+
+
+def test_alive_check_keeps_live_socket(server):
+    live = _raw_tcp()
+    assert _activate(live, 0x0E00) == 0x10
+    with _raw_tcp() as s:
+        s.sendall(_header(0x0005, 7) + struct.pack(">HB4x", 0x0E00, 0x00))
+        assert live.recv(64) == _header(0x0007, 0)
+        live.sendall(_header(0x0008, 2) + struct.pack(">H", 0x0E00))
+        assert s.recv(64)[12] == 0x03  # SA already active on a live socket
+    live.close()

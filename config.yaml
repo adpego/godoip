@@ -19,6 +19,7 @@ server:
   activation_types: [0x00, 0x01]
   initial_inactivity_ms: 2000   # close sockets without routing activation
   general_inactivity_ms: 300000 # close idle sockets
+  alive_check_timeout_ms: 500   # alive check sent when a source address is busy or all sockets are used
 
   announcement:
     enabled: true               # send vehicle announcements on start-up

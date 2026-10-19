@@ -10,6 +10,7 @@ server:
   client_logical_address_min: 0x0E00
   client_logical_address_max: 0x0E0F
   power_mode: 0x01
+  alive_check_timeout_ms: 200
   announcement:
     enabled: false
 

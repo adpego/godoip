@@ -19,15 +19,16 @@ type ServerConfig struct {
 	ClientLogicalAddressMin int    `yaml:"client_logical_address_min"`
 	ClientLogicalAddressMax int    `yaml:"client_logical_address_max"`
 
-	NodeType          string  `yaml:"node_type"`             // node | gateway; defaults to node
-	MaxTCPSockets     int     `yaml:"max_tcp_sockets"`       // defaults to 15
-	MaxDataSize       uint32  `yaml:"max_data_size"`         // max DoIP payload accepted; defaults to 4096
-	PowerMode         *uint8  `yaml:"power_mode"`            // diagnostic power mode; defaults to 0x01 (ready)
-	FurtherAction     uint8   `yaml:"further_action"`        // announcement further action required
-	VINGIDSyncStatus  *uint8  `yaml:"vin_gid_sync_status"`   // optional announcement byte; nil omits it
-	ActivationTypes   []uint8 `yaml:"activation_types"`      // supported routing activation types; defaults to 0x00, 0x01
-	InitialInactivity int     `yaml:"initial_inactivity_ms"` // close sockets without routing activation; defaults to 2000
-	GeneralInactivity int     `yaml:"general_inactivity_ms"` // close idle sockets; defaults to 300000
+	NodeType          string  `yaml:"node_type"`              // node | gateway; defaults to node
+	MaxTCPSockets     int     `yaml:"max_tcp_sockets"`        // defaults to 15
+	MaxDataSize       uint32  `yaml:"max_data_size"`          // max DoIP payload accepted; defaults to 4096
+	PowerMode         *uint8  `yaml:"power_mode"`             // diagnostic power mode; defaults to 0x01 (ready)
+	FurtherAction     uint8   `yaml:"further_action"`         // announcement further action required
+	VINGIDSyncStatus  *uint8  `yaml:"vin_gid_sync_status"`    // optional announcement byte; nil omits it
+	ActivationTypes   []uint8 `yaml:"activation_types"`       // supported routing activation types; defaults to 0x00, 0x01
+	InitialInactivity int     `yaml:"initial_inactivity_ms"`  // close sockets without routing activation; defaults to 2000
+	GeneralInactivity int     `yaml:"general_inactivity_ms"`  // close idle sockets; defaults to 300000
+	AliveCheckTimeout int     `yaml:"alive_check_timeout_ms"` // wait for alive check answers; defaults to 500
 
 	Announcement Announcement `yaml:"announcement"`
 }

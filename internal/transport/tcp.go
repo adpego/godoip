@@ -31,6 +31,7 @@ type TCPConfig struct {
 	ActivationTypes   []uint8       // supported routing activation types
 	InitialInactivity time.Duration // max time before routing activation
 	GeneralInactivity time.Duration // max idle time of an activated socket
+	AliveCheckTimeout time.Duration // wait for alive check responses
 }
 
 type TCPServer struct {
@@ -39,7 +40,7 @@ type TCPServer struct {
 	ecu    *uds.ECU
 
 	mu             sync.Mutex
-	activeSessions map[uint16]net.Conn // sourceAddr -> conn
+	activeSessions map[uint16]*connState // sourceAddr -> activated connection
 }
 
 func NewTCPServer(cfg TCPConfig, entity *Entity, ecu *uds.ECU) *TCPServer {
@@ -52,11 +53,14 @@ func NewTCPServer(cfg TCPConfig, entity *Entity, ecu *uds.ECU) *TCPServer {
 	if cfg.GeneralInactivity <= 0 {
 		cfg.GeneralInactivity = 5 * time.Minute
 	}
+	if cfg.AliveCheckTimeout <= 0 {
+		cfg.AliveCheckTimeout = 500 * time.Millisecond
+	}
 	return &TCPServer{
 		cfg:            cfg,
 		entity:         entity,
 		ecu:            ecu,
-		activeSessions: make(map[uint16]net.Conn),
+		activeSessions: make(map[uint16]*connState),
 	}
 }
 
@@ -92,8 +96,9 @@ type connState struct {
 	addr      uint16 // registered source address
 	activated bool
 
-	wmu  sync.Mutex    // serializes writes (responses and unsolicited messages)
-	done chan struct{} // closed when the connection ends
+	wmu   sync.Mutex    // serializes writes (responses and unsolicited messages)
+	done  chan struct{} // closed when the connection ends
+	alive chan struct{} // signaled when an alive check response is received
 }
 
 func (c *connState) write(b []byte) error {
@@ -131,12 +136,14 @@ func (s *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
 	log.Printf("TCP connection from %s", conn.RemoteAddr())
 
-	c := &connState{conn: conn, done: make(chan struct{})}
+	c := &connState{conn: conn, done: make(chan struct{}), alive: make(chan struct{}, 1)}
 	defer close(c.done)
 	defer func() {
 		if c.activated {
 			s.mu.Lock()
-			delete(s.activeSessions, c.addr)
+			if s.activeSessions[c.addr] == c {
+				delete(s.activeSessions, c.addr)
+			}
 			s.mu.Unlock()
 			log.Printf("Session 0x%04X unregistered", c.addr)
 		}
@@ -193,7 +200,12 @@ func (s *TCPServer) handleMessage(c *connState, payloadType uint16, payload []by
 		return c.write(doip.BuildAliveCheckResponse(s.version(), s.entity.cfg.LogicalAddress)) == nil
 
 	case doip.AliveCheckResp:
-		return true // only meaningful as an answer to our own alive checks
+		// Answer to an alive check sent by activate.
+		select {
+		case c.alive <- struct{}{}:
+		default:
+		}
+		return true
 
 	case doip.DiagnosticMessage:
 		return s.handleDiagnosticMessage(c, payload)
@@ -268,6 +280,9 @@ func (s *TCPServer) handleRoutingActivation(c *connState, payload []byte) bool {
 }
 
 // activate validates a routing activation and registers the source address.
+// When the address is active on another socket, or every socket is in use,
+// the concerned sockets receive an alive check first; those that do not
+// answer in time are closed and their slots freed (ISO 13400-2).
 func (s *TCPServer) activate(c *connState, req doip.RoutingActivationRequest) uint8 {
 	if !slices.Contains(s.cfg.ActivationTypes, req.ActivationType) {
 		return doip.ActivationDeniedUnsupportedType
@@ -283,14 +298,61 @@ func (s *TCPServer) activate(c *connState, req doip.RoutingActivationRequest) ui
 	}
 
 	s.mu.Lock()
+	var check []*connState
+	if other := s.activeSessions[req.SourceAddress]; other != nil {
+		check = []*connState{other}
+	} else if len(s.activeSessions) >= s.entity.cfg.MaxSockets {
+		for _, other := range s.activeSessions {
+			check = append(check, other)
+		}
+	}
+	s.mu.Unlock()
+	if len(check) > 0 {
+		s.aliveCheck(check)
+	}
+
+	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.activeSessions[req.SourceAddress]; ok {
+	if s.activeSessions[req.SourceAddress] != nil {
 		return doip.ActivationDeniedSAAlreadyActive
 	}
 	if len(s.activeSessions) >= s.entity.cfg.MaxSockets {
 		return doip.ActivationDeniedNoFreeSockets
 	}
-	s.activeSessions[req.SourceAddress] = c.conn
+	s.activeSessions[req.SourceAddress] = c
 	c.addr, c.activated = req.SourceAddress, true
 	return doip.ActivationSuccess
+}
+
+// aliveCheck sends alive check requests to conns and closes and unregisters
+// those that do not answer within AliveCheckTimeout.
+func (s *TCPServer) aliveCheck(conns []*connState) {
+	var wg sync.WaitGroup
+	for _, c := range conns {
+		select {
+		case <-c.alive: // discard stale answers
+		default:
+		}
+		c.write(doip.BuildAliveCheckRequest(s.version()))
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			timer := time.NewTimer(s.cfg.AliveCheckTimeout)
+			defer timer.Stop()
+			select {
+			case <-c.alive:
+			case <-c.done: // already closed: handleConn frees its slot
+			case <-timer.C:
+				log.Printf("Alive check: no answer from 0x%04X, closing socket", c.addr)
+				s.mu.Lock()
+				if s.activeSessions[c.addr] == c {
+					delete(s.activeSessions, c.addr)
+				}
+				s.mu.Unlock()
+				c.conn.Close()
+			}
+		}()
+	}
+	wg.Wait()
 }
