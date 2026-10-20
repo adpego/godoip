@@ -109,6 +109,11 @@ func SaveFile(path string, img *Image, f Format) error {
 	}
 	defer os.Remove(tmp.Name())
 
+	// CreateTemp uses 0600; the output is a regular, shareable file.
+	if err := tmp.Chmod(0o644); err != nil {
+		tmp.Close()
+		return err
+	}
 	if err := Encode(tmp, img, f); err != nil {
 		tmp.Close()
 		return err

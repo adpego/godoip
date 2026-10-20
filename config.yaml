@@ -63,13 +63,14 @@ ecu:
     # Authentication (ISO 14229-1:2020). APCE is enabled by ca_certificates,
     # ACR (HMAC-SHA256 over the server challenge) by secret. Being
     # authenticated unlocks `security_level` for every access block.
-    # authentication:
-    #   security_level: 0x7F
-    #   challenge_length: 32
-    #   ca_certificates: [pki/ca.pem]
-    #   server_certificate: pki/ecu.pem   # optional, bidirectional APCE
-    #   server_key: pki/ecu.key
-    #   secret: "00 11 22 33 44 55 66 77"
+    authentication:
+      security_level: 0x7F
+      challenge_length: 32
+      secret: "00 11 22 33 44 55 66 77"   # ACR
+      # APCE (see tests/e2e/pki for a test PKI):
+      # ca_certificates: [pki/ca.pem]
+      # server_certificate: pki/ecu.pem   # optional, bidirectional APCE
+      # server_key: pki/ecu.key
 
     # Simplified SecuredDataTransmission: HMAC-SHA256 signatures, no
     # encryption, anti-replay counter. The internal request goes through the

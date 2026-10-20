@@ -14,6 +14,22 @@ make run                          # go run ./cmd/server (uses ./config.yaml)
 go run ./cmd/server -config path/to/config.yaml
 make test                         # Go unit tests
 make e2e                          # end-to-end tests with doipclient + udsoncan
+make examples                     # call every service against a running server
+```
+
+## Python examples
+
+[`examples/client.py`](examples/client.py) calls every DoIP feature and UDS
+service against a server started with the default `config.yaml`, printing each
+request outcome. Services implemented by `udsoncan` use its client; 0x24,
+0x2A, 0x84 and 0x86 are sent as raw bytes.
+
+```sh
+make run                                         # terminal 1
+python examples/client.py                        # terminal 2: every section
+python examples/client.py security memory        # only some sections
+python examples/client.py --list                 # available sections
+python examples/client.py --host 192.168.1.10 --client 0x0E00 --version 2
 ```
 
 ## Implementation status
@@ -128,6 +144,7 @@ internal/uds/services/      one package per service + services.New wiring them a
   session/ ecureset/ security/ testerpresent/ did/ dtc/ memory/ routine/
   iocontrol/ commcontrol/ linkcontrol/ transfer/ dddi/ periodic/ roe/ auth/ sdt/
 tests/e2e/                  pytest suite using doipclient + udsoncan (own config, firmware, test PKI)
+examples/                   Python examples calling every service
 firmware/                   sample firmware and file-transfer root for config.yaml
 ```
 

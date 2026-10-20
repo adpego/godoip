@@ -285,6 +285,10 @@ func TestLoadAndSaveFile(t *testing.T) {
 		t.Errorf("saved data: got %q", got)
 	}
 
+	if info, _ := os.Stat(out); info.Mode().Perm() != 0o644 {
+		t.Errorf("output permissions: got %v, want 0644", info.Mode().Perm())
+	}
+
 	// The input file is untouched and no temporary files remain.
 	if content, _ := os.ReadFile(in); string(content) != sampleSREC {
 		t.Error("input file was modified")

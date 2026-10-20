@@ -1,4 +1,4 @@
-.PHONY: build run test e2e clean
+.PHONY: build run test e2e examples clean
 
 E2E_VENV := tests/e2e/.venv
 
@@ -19,6 +19,10 @@ $(E2E_VENV): tests/e2e/requirements.txt
 # End-to-end tests with doipclient/udsoncan against a real server.
 e2e: $(E2E_VENV)
 	cd tests/e2e && .venv/bin/python -m pytest -q
+
+# Examples of every service against a running server (make run).
+examples: $(E2E_VENV)
+	$(E2E_VENV)/bin/python examples/client.py
 
 clean:
 	rm -rf bin/
