@@ -109,8 +109,10 @@ See [`config.yaml`](config.yaml) for a complete, commented example.
 - `ecu.dids`: shared by 0x22 / 0x24 / 0x2C / 0x2E / 0x2F (and routine effects).
 - `ecu.dtcs`: shared by 0x19 / 0x14 / 0x85 (and routine effects).
 - `ecu.routines`: RoutineControl definitions.
-- `ecu.memory`: firmware file used by 0x23 / 0x3D. Writes go to
-  `output_file`, never to `file`.
+- `ecu.memory`: firmware file used by 0x23 / 0x2C / 0x34–0x37 / 0x3D. Writes
+  go to `output_file`, never to `file`.
+- `request_file_transfer.root`: directory exposed by 0x38 (`firmware/files`
+  in the example); paths can never escape it.
 
 ## Project layout
 
@@ -125,8 +127,8 @@ internal/uds/udstest/       test helpers for services
 internal/uds/services/      one package per service + services.New wiring them all
   session/ ecureset/ security/ testerpresent/ did/ dtc/ memory/ routine/
   iocontrol/ commcontrol/ linkcontrol/ transfer/ dddi/ periodic/ roe/ auth/ sdt/
-tests/e2e/                  pytest suite using doipclient + udsoncan
-firmware/                   sample firmware for config.yaml
+tests/e2e/                  pytest suite using doipclient + udsoncan (own config, firmware, test PKI)
+firmware/                   sample firmware and file-transfer root for config.yaml
 ```
 
 ### Adding a service
@@ -136,3 +138,12 @@ firmware/                   sample firmware for config.yaml
    function returning `nil` when `cfg` is nil, plus its tests.
 3. Add one step to `internal/uds/services/services.go`.
 4. Add an example to `config.yaml`, e2e tests and update the table above.
+
+## Next steps
+
+- ReadDTCInformation: mirror memory (0x0F–0x13), user-defined memory
+  (0x17–0x19), stored data by record number (0x05) and OBD reports (0x42, 0x55, 0x56).
+- ResponseOnEvent: onComparisonOfValues (0x07).
+- RequestFileTransfer: resumeFile (0x06).
+- SecuredDataTransmission: encryption.
+- DoIP: TLS on port 3496, IPv6 / multicast announcements.
