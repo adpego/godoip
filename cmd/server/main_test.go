@@ -105,3 +105,30 @@ func TestAnnouncementConfig(t *testing.T) {
 		t.Errorf("custom: %+v", a)
 	}
 }
+
+func TestServerDefaults(t *testing.T) {
+	cfg, err := config.Parse([]byte("server:\n  logical_address: 0x0E80\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	applyServerDefaults(&cfg.Server)
+	s := cfg.Server
+	if s.TCPPort != 13400 || s.UDPPort != 13400 || s.DoIPVersion != 0x02 ||
+		s.ClientLogicalAddressMin != 0x0E00 || s.ClientLogicalAddressMax != 0x0FFF {
+		t.Errorf("defaults: %+v", s)
+	}
+	e, err := buildEntityConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.EID != [6]byte{} || e.GID != [6]byte{} {
+		t.Errorf("EID/GID default to zeros: %+v", e)
+	}
+
+	cfg.Server = config.ServerConfig{TCPPort: 1, UDPPort: 2, DoIPVersion: 0x03, ClientLogicalAddressMax: 0x0E10}
+	applyServerDefaults(&cfg.Server)
+	if s := cfg.Server; s.TCPPort != 1 || s.UDPPort != 2 || s.DoIPVersion != 0x03 ||
+		s.ClientLogicalAddressMin != 0 || s.ClientLogicalAddressMax != 0x0E10 {
+		t.Errorf("configured values must be kept: %+v", s)
+	}
+}

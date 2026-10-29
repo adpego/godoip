@@ -18,6 +18,10 @@ const (
 	defaultAnnounceAddress   = "255.255.255.255"
 	defaultAnnounceCount     = 3
 	defaultAnnounceInterval  = 500 * time.Millisecond
+	defaultPort              = 13400 // ISO 13400-2 UDP_DISCOVERY / TCP_DATA
+	defaultDoIPVersion       = 0x02  // ISO 13400-2:2012
+	defaultClientAddrMin     = 0x0E00
+	defaultClientAddrMax     = 0x0FFF // ISO 13400-2 external test equipment range
 
 	// vinDID is the standard VIN data identifier, used when no VIN is configured.
 	vinDID = 0xF190
@@ -31,6 +35,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
+	applyServerDefaults(&cfg.Server)
 
 	ecu, err := services.New(cfg.ECU)
 	if err != nil {
@@ -53,6 +58,23 @@ func main() {
 
 	if err := <-errCh; err != nil {
 		log.Fatal(err)
+	}
+}
+
+// applyServerDefaults fills the DoIP settings left out of the configuration
+// with their ISO 13400-2 defaults.
+func applyServerDefaults(s *config.ServerConfig) {
+	if s.TCPPort == 0 {
+		s.TCPPort = defaultPort
+	}
+	if s.UDPPort == 0 {
+		s.UDPPort = defaultPort
+	}
+	if s.DoIPVersion == 0 {
+		s.DoIPVersion = defaultDoIPVersion
+	}
+	if s.ClientLogicalAddressMin == 0 && s.ClientLogicalAddressMax == 0 {
+		s.ClientLogicalAddressMin, s.ClientLogicalAddressMax = defaultClientAddrMin, defaultClientAddrMax
 	}
 }
 
@@ -157,8 +179,12 @@ func announcedVIN(cfg *config.Config) (string, error) {
 	return "", nil
 }
 
+// parseHWAddr parses a 6-byte EID/GID; an empty string gives all zeros.
 func parseHWAddr(s string) ([6]byte, error) {
 	var out [6]byte
+	if s == "" {
+		return out, nil
+	}
 	hw, err := net.ParseMAC(s)
 	if err != nil {
 		return out, err

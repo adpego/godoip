@@ -109,7 +109,9 @@ See [`config.yaml`](config.yaml) for a complete, commented example.
   ECU physical address; `functional_address` defaults to `0xE400`.
   `server.announcement` controls the start-up vehicle announcements
   (`enabled: false` to disable them); node type, power mode, socket limits,
-  activation types and inactivity timers are configurable too.
+  activation types and inactivity timers are configurable too. Unset values
+  take ISO 13400-2 defaults: ports 13400, protocol version 0x02, tester
+  addresses 0x0E00–0x0FFF, EID/GID all zeros.
 - `ecu.services`: a service missing from this map is not supported (NRC 0x11);
   use `{}` to enable it with defaults. Every service accepts an `access` block
   and a `response_pending: {count, interval_ms}` block to simulate a slow ECU
