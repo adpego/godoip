@@ -35,7 +35,7 @@ type session struct {
 	commit      func(data []byte) bool // download: applies the data on exit
 	offset      uint32                 // bytes transferred
 	counter     uint8                  // last accepted blockSequenceCounter
-	lastLen     int                    // length of the last accepted download block (repeat detection)
+	lastLen     int                    // length of the last block (repeat detection / resend)
 	maxBlockLen uint32
 }
 
@@ -220,6 +220,12 @@ func (t *Transfer) transferData(_ *uds.Context, req uds.Request) []byte {
 		if len(req.Data) != 2 {
 			return uds.NegativeResponse(req.SID, uds.NRCInvalidMessageLengthOrFormat)
 		}
+		if s.offset > 0 && counter == s.counter {
+			// Repeated request (the positive response was lost): send the
+			// previous block again.
+			block := s.data[s.offset-uint32(s.lastLen) : s.offset]
+			return uds.PositiveResponse(req.SID, append([]byte{counter}, block...)...)
+		}
 		if counter != s.counter+1 {
 			return uds.NegativeResponse(req.SID, uds.NRCWrongBlockSequenceCounter)
 		}
@@ -230,6 +236,7 @@ func (t *Transfer) transferData(_ *uds.Context, req uds.Request) []byte {
 		block := s.data[s.offset : s.offset+n]
 		s.offset += n
 		s.counter = counter
+		s.lastLen = int(n)
 		return uds.PositiveResponse(req.SID, append([]byte{counter}, block...)...)
 	}
 

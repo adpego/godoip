@@ -112,7 +112,11 @@ func TestUpload(t *testing.T) {
 	udstest.Send(t, v.e, []byte{0x36, 0x01}, append([]byte{0x76, 0x01}, "CALI"...))
 	udstest.Send(t, v.e, []byte{0x36, 0x02, 0x00}, udstest.NRC(0x36, uds.NRCInvalidMessageLengthOrFormat))
 	udstest.Send(t, v.e, []byte{0x36, 0x02}, append([]byte{0x76, 0x02}, "BRAT"...))
+	// Repeated request: the previous block is sent again.
+	udstest.Send(t, v.e, []byte{0x36, 0x02}, append([]byte{0x76, 0x02}, "BRAT"...))
+	udstest.Send(t, v.e, []byte{0x36, 0x01}, udstest.NRC(0x36, uds.NRCWrongBlockSequenceCounter))
 	udstest.Send(t, v.e, []byte{0x37}, udstest.NRC(0x37, uds.NRCRequestSequenceError))
+	udstest.Send(t, v.e, []byte{0x36, 0x03}, append([]byte{0x76, 0x03}, "ION"...))
 	udstest.Send(t, v.e, []byte{0x36, 0x03}, append([]byte{0x76, 0x03}, "ION"...))
 	udstest.Send(t, v.e, []byte{0x36, 0x04}, udstest.NRC(0x36, uds.NRCRequestSequenceError))
 	udstest.Send(t, v.e, []byte{0x37}, []byte{0x77})
