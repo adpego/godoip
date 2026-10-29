@@ -148,26 +148,51 @@ func handle(ctx *uds.Context, req uds.Request, controls map[uint16]*control, sto
 		}
 	}
 
+	// The controlEnableMask (if any) is the last `size` bytes of the record:
+	// only the bits it enables are affected.
+	var mask []byte
+	if c.enableMask && len(record) >= size {
+		mask = record[len(record)-size:]
+	}
 	switch param {
 	case ReturnControlToECU:
-		c.returnToECU(store)
+		if mask == nil || allOnes(mask) {
+			c.returnToECU(store)
+		} else if c.controlled {
+			store.Set(c.id, merge(store.Get(c.id).Value, c.ecuValue, mask))
+		}
 	case ResetToDefault:
 		c.take(store)
-		store.Set(c.id, c.def)
+		store.Set(c.id, merge(store.Get(c.id).Value, c.def, mask))
 	case FreezeCurrentState:
 		c.take(store)
 	case ShortTermAdjustment:
 		c.take(store)
-		value := append([]byte(nil), record[:size]...)
-		if c.enableMask {
-			cur, mask := store.Get(c.id).Value, record[size:]
-			for i := range value {
-				value[i] = cur[i]&^mask[i] | value[i]&mask[i]
-			}
-		}
-		store.Set(c.id, value)
+		store.Set(c.id, merge(store.Get(c.id).Value, record[:size], mask))
 	}
 
 	resp := uds.PositiveResponse(req.SID, req.Data[1], req.Data[2], param)
 	return append(resp, store.Get(c.id).Value...)
+}
+
+// merge returns cur with the bits enabled by mask taken from value; a nil
+// mask takes the whole value.
+func merge(cur, value, mask []byte) []byte {
+	if mask == nil {
+		return append([]byte(nil), value...)
+	}
+	out := make([]byte, len(cur))
+	for i := range out {
+		out[i] = cur[i]&^mask[i] | value[i]&mask[i]
+	}
+	return out
+}
+
+func allOnes(b []byte) bool {
+	for _, v := range b {
+		if v != 0xFF {
+			return false
+		}
+	}
+	return true
 }
