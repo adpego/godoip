@@ -23,8 +23,8 @@ E2E_DIR = Path(__file__).resolve().parent
 # Files copied to the per-test working directory of the server.
 SERVER_FILES = ["config.yaml", "firmware.s19"]
 
-TCP_PORT = 13410
-UDP_PORT = 13410
+TCP_PORT = 13400  # standard DoIP ports
+UDP_PORT = 13400
 ECU_ADDRESS = 0x0E80
 CLIENT_ADDRESS = 0x0E00
 FUNCTIONAL_ADDRESS = 0xE400
@@ -51,6 +51,17 @@ def _wait_for_port(host, port, proc, timeout=10.0):
     raise TimeoutError(f"server did not open {host}:{port}")
 
 
+def _ensure_port_free(port):
+    """Fails if a server already listens on the port: the tests would
+    otherwise talk to it instead of the one they start."""
+    try:
+        socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
+    except OSError:
+        return
+    raise RuntimeError(f"port {port} is already in use: stop the running DoIP server "
+                       "(or set GODOIP_HOST to test it)")
+
+
 class ServerProcess:
     """Runs the server binary in a working directory with a copy of the e2e
     configuration, optionally edited with text replacements."""
@@ -67,6 +78,7 @@ class ServerProcess:
             text = text.replace(old, new)
         config.write_text(text)
 
+        _ensure_port_free(tcp_port)
         self.log = open(workdir / "server.log", "w")
         self.proc = subprocess.Popen(
             [str(binary), "-config", str(config)],

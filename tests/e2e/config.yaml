@@ -1,7 +1,7 @@
 # Configuration used by the end-to-end tests. Keep it in sync with the tests.
 server:
-  tcp_port: 13410
-  udp_port: 13410
+  tcp_port: 13400
+  udp_port: 13400
   doip_version: 0x02
   logical_address: 0x0E80
   functional_address: 0xE400
