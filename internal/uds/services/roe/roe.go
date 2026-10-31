@@ -62,7 +62,7 @@ type service struct {
 
 	events     []*event
 	active     bool
-	identified uint8 // events identified (fired) since start
+	identified uint8 // events identified (fired) since start, until cleared
 	deadline   time.Time
 	client     uds.Client
 	stop       chan struct{}
@@ -98,7 +98,7 @@ func Register(e *uds.ECU, cfg *config.ROEService, deps Deps) error {
 	e.OnSessionChange(func(_, to uint8) {
 		if to == uds.SessionDefault {
 			s.deactivate()
-			s.events = nil
+			s.events, s.identified = nil, 0
 		}
 	})
 
@@ -201,7 +201,11 @@ func (s *service) control(c *uds.Context, req uds.Request, eventType uint8) []by
 		s.deactivate()
 		s.events = nil
 	}
-	return uds.PositiveResponse(req.SID, req.Data[1], s.identified, window)
+	resp := uds.PositiveResponse(req.SID, req.Data[1], s.identified, window)
+	if eventType == ClearResponseOnEvent {
+		s.identified = 0 // the count belongs to the cleared events
+	}
+	return resp
 }
 
 func (s *service) report(req uds.Request) []byte {
